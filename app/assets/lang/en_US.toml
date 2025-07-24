@@ -255,6 +255,7 @@ deleteFailedTitle = "Failed to Delete<br>Drop-in Mod {fullName}"
 deleteFailedMessage = "Make sure the file is not in use and try again."
 failedToggleTitle = "Failed to Toggle<br>One or More Drop-in Mods"
 okButton = "Okay"
+shaderOff = "Off (Default)"
 
 [js.settings.serverListing]
 mainServer = "Main Server"

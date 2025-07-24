@@ -18,15 +18,15 @@ function loginOptionsCancelEnabled(val){
     }
 }
 
-loginOptionMicrosoft.onclick = (e) => {
-    switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
-        ipcRenderer.send(
-            MSFT_OPCODE.OPEN_LOGIN,
-            loginOptionsViewOnLoginSuccess,
-            loginOptionsViewOnLoginCancel
-        )
-    })
-}
+// loginOptionMicrosoft.onclick = (e) => {
+//     switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
+//         ipcRenderer.send(
+//             MSFT_OPCODE.OPEN_LOGIN,
+//             loginOptionsViewOnLoginSuccess,
+//             loginOptionsViewOnLoginCancel
+//         )
+//     })
+// }
 
 loginOptionMojang.onclick = (e) => {
     switchView(getCurrentView(), VIEWS.login, 500, 500, () => {

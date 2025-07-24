@@ -3,6 +3,8 @@ const path      = require('path')
 const { ipcRenderer, shell } = require('electron')
 const { SHELL_OPCODE } = require('./ipcconstants')
 
+const Lang = require('./langloader')
+
 // Group #1: File Name (without .disabled, if any)
 // Group #2: File Extension (jar, zip, or litemod)
 // Group #3: If it is disabled (if string 'disabled' is present)
@@ -156,7 +158,7 @@ exports.scanForShaderpacks = function(instanceDir){
     const shaderDir = path.join(instanceDir, SHADER_DIR)
     const packsDiscovered = [{
         fullName: 'OFF',
-        name: 'Off (Default)'
+        name: Lang.queryJS('settings.dropinMods.shaderOff')
     }]
     if(fs.existsSync(shaderDir)){
         let modCandidates = fs.readdirSync(shaderDir)

@@ -16,6 +16,7 @@ const { MojangRestAPI, MojangErrorCode } = require('helios-core/mojang')
 const { MicrosoftAuth, MicrosoftErrorCode } = require('helios-core/microsoft')
 const { AZURE_CLIENT_ID }    = require('./ipcconstants')
 const Lang = require('./langloader')
+const { uuid } = require('discord-rpc-patch/src/util')
 
 const log = LoggerUtil.getLogger('AuthManager')
 
@@ -139,18 +140,22 @@ function mojangErrorDisplayable(errorCode) {
  * @param {string} password The account password.
  * @returns {Promise.<Object>} Promise which resolves the resolved authenticated account object.
  */
-exports.addMojangAccount = async function(username, password) {
+//exports.addMojangAccount = async function(username, password) {
+exports.addMojangAccount = async function(username) {
     try {
-        const response = await MojangRestAPI.authenticate(username, password, ConfigManager.getClientToken())
-        console.log(response)
-        if(response.responseStatus === RestResponseStatus.SUCCESS) {
+        //const response = await MojangRestAPI.authenticate(username, password, ConfigManager.getClientToken())
+        //console.log(response)
+        //if(response.responseStatus === RestResponseStatus.SUCCESS) {
+        if(true) {
 
-            const session = response.data
-            if(session.selectedProfile != null){
-                const ret = ConfigManager.addMojangAuthAccount(session.selectedProfile.id, session.accessToken, username, session.selectedProfile.name)
-                if(ConfigManager.getClientToken() == null){
-                    ConfigManager.setClientToken(session.clientToken)
-                }
+            //const session = response.data
+            if(true){
+                //const ret = ConfigManager.addMojangAuthAccount(session.selectedProfile.id, session.accessToken, username, session.selectedProfile.name)
+                const ret = ConfigManager.addMojangAuthAccount(uuid(), 111, username, username)
+                // if(ConfigManager.getClientToken() == null){
+                //     ConfigManager.setClientToken(222)
+                // }
+                ConfigManager.setClientToken(222)
                 ConfigManager.save()
                 return ret
             } else {
@@ -254,11 +259,11 @@ exports.addMicrosoftAccount = async function(authCode) {
 
     const ret = ConfigManager.addMicrosoftAuthAccount(
         fullAuth.mcProfile.id,
-        fullAuth.mcToken.access_token,
-        fullAuth.mcProfile.name,
+        fullAuth.mcToken.access_token, //"123"
+        fullAuth.mcProfile.name, //"Haru3"
         calculateExpiryDate(now, fullAuth.mcToken.expires_in),
-        fullAuth.accessToken.access_token,
-        fullAuth.accessToken.refresh_token,
+        fullAuth.accessToken.access_token, //"231"
+        fullAuth.accessToken.refresh_token, //"312"
         calculateExpiryDate(now, fullAuth.accessToken.expires_in)
     )
     ConfigManager.save()
@@ -276,8 +281,9 @@ exports.addMicrosoftAccount = async function(authCode) {
 exports.removeMojangAccount = async function(uuid){
     try {
         const authAcc = ConfigManager.getAuthAccount(uuid)
-        const response = await MojangRestAPI.invalidate(authAcc.accessToken, ConfigManager.getClientToken())
-        if(response.responseStatus === RestResponseStatus.SUCCESS) {
+        //const response = await MojangRestAPI.invalidate(authAcc.accessToken, ConfigManager.getClientToken())
+        //if(response.responseStatus === RestResponseStatus.SUCCESS) {
+        if(true) {
             ConfigManager.removeAuthAccount(uuid)
             ConfigManager.save()
             return Promise.resolve()
@@ -318,6 +324,7 @@ exports.removeMicrosoftAccount = async function(uuid){
  * otherwise false.
  */
 async function validateSelectedMojangAccount(){
+    return true
     const current = ConfigManager.getSelectedAccount()
     const response = await MojangRestAPI.validate(current.accessToken, ConfigManager.getClientToken())
 
@@ -353,6 +360,7 @@ async function validateSelectedMojangAccount(){
  * otherwise false.
  */
 async function validateSelectedMicrosoftAccount(){
+    return true
     const current = ConfigManager.getSelectedAccount()
     const now = new Date().getTime()
     const mcExpiresAt = current.expiresAt
