@@ -974,6 +974,13 @@ document.addEventListener('keydown', async (e) => {
     if(getCurrentView() === VIEWS.settings && selectedSettingsTab === 'settingsTabMods'){
         if(e.key === 'F5'){
             await reloadDropinMods()
+        }
+    }
+})
+
+document.addEventListener('keydown', async (e) => {
+    if(getCurrentView() === VIEWS.settings && selectedSettingsTab === 'settingsTabShaders'){
+        if(e.key === 'F5'){
             saveShaderpackSettings()
             await resolveShaderpacksForUI()
         }
