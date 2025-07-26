@@ -4,15 +4,14 @@
 
 <!-- [<p align="center"><img src="https://img.shields.io/github/actions/workflow/status/dscalzi/HeliosLauncher/build.yml?branch=master&style=for-the-badge" alt="gh actions">](https://github.com/dscalzi/HeliosLauncher/actions) [<img src="https://img.shields.io/github/downloads/dscalzi/HeliosLauncher/total.svg?style=for-the-badge" alt="downloads">](https://github.com/dscalzi/HeliosLauncher/releases) <img src="https://forthebadge.com/images/badges/winter-is-coming.svg"  height="28px" alt="winter-is-coming"></p> -->
 
-<p align="center">Присоединяйся к Кофеопии используя наш лаучер.</p>
+Присоединяйся к [Кофеопии](https://discord.gg/E67j4T9z) используя наш лаучер.
 
-![Screenshot 1](https://i.imgur.com/6o7SmH6.png)
-![Screenshot 2](https://i.imgur.com/x3B34n1.png)
+![Screenshot 1](https://media.discordapp.net/attachments/1119401827084009515/1398699465166159963/image.png?ex=68864fe3&is=6884fe63&hm=92ffbc6372eca9857d11e4c55b8cc2a2b884405e78ced9df92ec433c76c431ed&=&format=webp&quality=lossless)
+![Screenshot 2](https://media.discordapp.net/attachments/1119401827084009515/1398699465619275776/image.png?ex=68864fe3&is=6884fe63&hm=b4eb601de36ac972d4e4de564cfff02fb065ec52eea5a01b42fbda78d7679ae9&=&format=webp&quality=lossless)
 
 ## Features
 
 * 🔒 Удобная система аккаунтов.
-  * а
   * Вы можете добавить несколько аккаунтов, если есть необходимость.
 * 📂 Эффективний менеджмент ресурсов.
   * Получайте обновления клиента как только мы их выпускаем.
@@ -29,29 +28,19 @@
 
 This is not an exhaustive list. Download and install the launcher to gauge all it can do!
 
-## Downloads
+## Скачать
 
 Вы можете скачать из [GitHub Релизов](https://github.com/MrFire24/CoffeeOpiaLauncher/releases)
 
-#### Latest Release
+#### Последний Релиз
 
 [![](https://img.shields.io/github/release/MrFire24/CoffeeOpiaLauncher.svg?style=flat-square)](https://github.com/MrFire24/CoffeeOpiaLauncher/releases/latest)
 
-#### Latest Pre-Release
+#### Последний Пре-Релиз
 [![](https://img.shields.io/github/release/MrFire24/CoffeeOpiaLauncher/all.svg?style=flat-square)](https://github.com/MrFire24/CoffeeOpiaLauncher/releases)
 
-**Supported Platforms**
 
-If you download from the [Releases](https://github.com/MrFire24/CoffeeOpiaLauncher/releases) tab, select the installer for your system.
-
-| Platform | File |
-| -------- | ---- |
-| Windows x64 | `CoffeeOpia-Launcher-setup-VERSION.exe` |
-| macOS x64 | `CoffeeOpia-Launcher-setup-VERSION-x64.dmg` |
-| macOS arm64 | `CoffeeOpia-Launcher-setup-VERSION-arm64.dmg` |
-| Linux x64 | `CoffeeOpia-Launcher-setup-VERSION.AppImage` |
-
-## Console
+## Консоль
 
 Что-бы открыть консоль используйте следующее сочетание клавишь.
 (откроется только если что-то пошло не так)
@@ -59,7 +48,6 @@ If you download from the [Releases](https://github.com/MrFire24/CoffeeOpiaLaunch
 ```console
 ctrl + shift + i
 ```
-
 
 #### Export Output to a File
 
