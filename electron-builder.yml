@@ -1,4 +1,4 @@
-appId: 'helioslauncher'
+appId: 'coffeeopialauncher'
 productName: 'CoffeeOpia Launcher'
 artifactName: '${productName}-setup-${version}.${ext}'
 
