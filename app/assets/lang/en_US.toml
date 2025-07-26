@@ -22,22 +22,22 @@ newsErrorNoneSpan = "No News"
 loginCancelText = "Cancel"
 loginSubheader = "MINECRAFT LOGIN"
 loginEmailError = "* Invalid Value"
-loginEmailPlaceholder = "EMAIL OR USERNAME"
+loginEmailPlaceholder = "USERNAME"
 loginPasswordError = "* Required"
 loginPasswordPlaceholder = "PASSWORD"
-loginForgotPasswordLink = "https://minecraft.net/password/forgot/"
+loginForgotPasswordLink = "https://discord.gg/yvnya3NG"
 loginForgotPasswordText = "forgot password?"
 loginRememberMeText = "remember me?"
 loginButtonText = "LOGIN"
-loginNeedAccountLink = "https://minecraft.net/store/minecraft-java-edition/"
+loginNeedAccountLink = "https://discord.gg/yvnya3NG"
 loginNeedAccountText = "Need an Account?"
-loginPasswordDisclaimer1 = "Your password is sent directly to mojang and never stored."
-loginPasswordDisclaimer2 = "{appName} is not affiliated with Mojang AB."
+loginPasswordDisclaimer1 = "To play on the server with your chosen nickname, you’ll need to get access first"
+loginPasswordDisclaimer2 = "You’ll only need a password when joining the server — you’ll set it yourself the first time you log in"
 
 [ejs.loginOptions]
 loginOptionsTitle = "Login Options"
 loginWithMicrosoft = "Login with Microsoft"
-loginWithMojang = "Login with Mojang"
+loginWithMojang = "Login"
 cancelButton = "Cancel"
 
 [ejs.overlay]
@@ -53,6 +53,7 @@ navHeaderText = "Settings"
 navAccount = "Account"
 navMinecraft = "Minecraft"
 navMods = "Mods"
+navShaders = "Шейдеры"
 navJava = "Java"
 navLauncher = "Launcher"
 navAbout = "About"
@@ -70,9 +71,11 @@ gameResolutionTitle = "Game Resolution"
 launchFullscreenTitle = "Launch in fullscreen."
 autoConnectTitle = "Automatically connect to the server on launch."
 launchDetachedTitle = "Launch game process detached from launcher."
-launchDetachedDesc = "If the game is not detached, closing the launcher will also close the game."
+launchDetachedDesc = "If the game is NOT detached, closing the launcher will also close the game."
 tabModsHeaderText = "Mod Settings"
 tabModsHeaderDesc = "Enable or disable mods."
+tabShadersHeaderText = "Shaders Settings"
+tabShadersHeaderDesc = "Enable or disable shaders."
 switchServerButton = "Switch"
 requiredMods = "Required Mods"
 optionalMods = "Optional Mods"
@@ -101,6 +104,8 @@ launcherTabHeaderText = "Launcher Settings"
 launcherTabHeaderDesc = "Options related to the launcher itself."
 allowPrereleaseTitle = "Allow Pre-Release Updates."
 allowPrereleaseDesc = "Pre-Releases include new features which may have not been fully tested or integrated.<br>This will always be true if you are using a pre-release version."
+launcherFontSizeTitle = "Font Size"
+launcherFontSizeDesc = "Adjusts the font size throughout the entire launcher"
 dataDirectoryTitle = "Data Directory"
 selectDataDirectory = "Select Data Directory"
 chooseFolder = "Choose Folder"
@@ -204,7 +209,7 @@ errorDuringFileDownloadTitle = "Error During File Download"
 preparingToLaunch = "Preparing to launch.."
 launchingGame = "Launching game.."
 launchWrapperNotDownloaded = "The main file, LaunchWrapper, failed to download properly. As a result, the game cannot launch.<br><br>To fix this issue, temporarily turn off your antivirus software and launch the game again.<br><br>If you have time, please <a href=\"https://github.com/dscalzi/HeliosLauncher/issues\">submit an issue</a> and let us know what antivirus software you use. We'll contact them and try to straighten things out."
-doneEnjoyServer = "Done. Enjoy the server!"
+doneEnjoyServer = "Launching soon!<br>Have fun :3"
 checkConsoleForDetails = "Please check the console (CTRL + Shift + i) for more details."
 
 [js.landing.news]
@@ -212,7 +217,7 @@ checking = "Checking for News"
 
 [js.landing.discord]
 loading = "Loading game.."
-joining = "Sailing to Westeros!"
+joining = "Sailing to CoffeeOpia!"
 joined = "Exploring the Realm!"
 
 [js.overlay]
@@ -305,41 +310,59 @@ checkForUpdatesButton = "Check for Updates"
 [js.auth.microsoft.error]
 noProfileTitle = "Error During Login:<br>Profile Not Set Up"
 noProfileDesc = "Your Microsoft account does not yet have a Minecraft profile set up. If you have recently purchased the game or redeemed it through Xbox Game Pass, you have to set up your profile on <a href=\"https://minecraft.net/\">Minecraft.net</a>.<br><br>If you have not yet purchased the game, you can also do that on <a href=\"https://minecraft.net/\">Minecraft.net</a>."
+
 noXboxAccountTitle = "Error During Login:<br>No Xbox Account"
 noXboxAccountDesc = "Your Microsoft account has no Xbox account associated with it."
+
 xblBannedTitle = "Error During Login:<br>Xbox Live Unavailable"
 xblBannedDesc = "Your Microsoft account is from a country where Xbox Live is not available or banned."
+
 under18Title = "Error During Login:<br>Parental Approval Required"
 under18Desc = "Accounts for users under the age of 18 must be added to a Family by an adult."
+
 unknownTitle = "Unknown Error During Login"
 unknownDesc = "An unknown error has occurred. Please see the console for details."
+
 
 [js.auth.mojang.error]
 methodNotAllowedTitle = "Internal Error:<br>Method Not Allowed"
 methodNotAllowedDesc = "Method not allowed. Please report this error."
+
 notFoundTitle = "Internal Error:<br>Not Found"
 notFoundDesc = "The authentication endpoint was not found. Please report this issue."
+
 accountMigratedTitle = "Error During Login:<br>Account Migrated"
 accountMigratedDesc = "You've attempted to login with a migrated account. Try again using the account email as the username."
+
 invalidCredentialsTitle = "Error During Login:<br>Invalid Credentials"
 invalidCredentialsDesc = "The email or password you've entered is incorrect. Please try again."
+
 tooManyAttemptsTitle = "Error During Login:<br>Too Many Attempts"
 tooManyAttemptsDesc = "There have been too many login attempts with this account recently. Please try again later."
+
 invalidTokenTitle = "Error During Login:<br>Invalid Token"
 invalidTokenDesc = "The provided access token is invalid."
+
 tokenHasProfileTitle = "Error During Login:<br>Token Has Profile"
 tokenHasProfileDesc = "Access token already has a profile assigned. Selecting profiles is not implemented yet."
+
 credentialsMissingTitle = "Error During Login:<br>Credentials Missing"
 credentialsMissingDesc = "Username/password was not submitted or password is less than 3 characters."
+
 invalidSaltVersionTitle = "Error During Login:<br>Invalid Salt Version"
 invalidSaltVersionDesc = "Invalid salt version."
+
 unsupportedMediaTypeTitle = "Internal Error:<br>Unsupported Media Type"
 unsupportedMediaTypeDesc = "Unsupported media type. Please report this error."
+
 accountGoneTitle = "Error During Login:<br>Account Migrated"
 accountGoneDesc = "Account has been migrated to a Microsoft account. Please log in with Microsoft."
+
 unreachableTitle = "Error During Login:<br>Unreachable"
 unreachableDesc = "Unable to reach the authentication servers. Ensure that they are online and you are connected to the internet."
+
 gameNotPurchasedTitle = "Error During Login:<br>Game Not Purchased"
 gameNotPurchasedDesc = "The account you are trying to login with has not purchased a copy of Minecraft. You may purchase a copy on <a href=\"https://minecraft.net/\">Minecraft.net</a>"
+
 unknownErrorTitle = "Unknown Error During Login"
 unknownErrorDesc = "An unknown error has occurred. Please see the console for details."

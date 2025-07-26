@@ -971,6 +971,7 @@ async function loadNews(){
         $.ajax({
             url: newsFeed,
             success: (data) => {
+                //loggerLanding.debug(($(data)).text())
                 const items = $(data).find('item')
                 const articles = []
 
