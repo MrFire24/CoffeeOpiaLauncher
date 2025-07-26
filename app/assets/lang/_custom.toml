@@ -15,6 +15,8 @@ sourceGithubLink = "https://github.com/MrFire24/CoffeeOpiaLauncher"
 supportLink = "https://github.com/MrFire24/CoffeeOpiaLauncher/issues"
 
 [ejs.welcome]
-welcomeHeader = "WELCOME TO WESTEROSCRAFT"
-welcomeDescription = "Our mission is to recreate the universe imagined by author George RR Martin in his fantasy series, A Song of Ice and Fire.  Through the collaborative effort of thousands of community members, we have sought to create Westeros as accurately and precisely as possible within Minecraft.  The world we are creating is yours to explore.  Journey from Dorne to Castle Black, and if you aren’t afraid, beyond the Wall itself, but best not delay.  As the words of House Stark ominously warn: Winter is Coming."
-welcomeDescCTA = "You are just a few clicks away from Westeros."
+welcomeHeader = "Добро Пожаловать CoffeeOpia"
+welcomeDescription = "Кофеопия это майнкрафт сервер ценитель кофе ☕<br>
+Здесь вы найдёте новых друзей и просто товарищей по кофе 🍪<br>
+Каждый может стать частью нашего сервера и сделать из него нечто большое чем просто сервер по Майнкрафту ✨"
+welcomeDescCTA = "Вы всего в паре кликов от Кофеопии."

@@ -27,7 +27,7 @@
                 <span class="loginErrorSpan" id="loginPasswordError"><%- lang('login.loginPasswordError') %></span>
                 <input id="loginPassword" class="loginField" type="password" placeholder="<%- lang('login.loginPasswordPlaceholder') %>"/>
             </div> -->
-            <div id="loginOptions">
+            <div id="loginFieldContainer">
                 <!-- <span class="loginSpanDim">
                     <a href="<%- lang('login.loginForgotPasswordLink') %>"><%- lang('login.loginForgotPasswordText') %></a>
                 </span> -->
@@ -52,13 +52,13 @@
                     <!--<div class="spinningCircle" id="loginSpinner"></div>-->
                 </div>
             </button>
-            <!-- <div id="loginDisclaimer">
-                <span class="loginSpanDim" id="loginRegisterSpan">
+            <div id="loginDisclaimer">
+                <!-- <span class="loginSpanDim" id="loginRegisterSpan">
                     <a href="<%- lang('login.loginNeedAccountLink') %>"><%- lang('login.loginNeedAccountText') %></a>
-                </span>
+                </span> -->
                 <p class="loginDisclaimerText"><%- lang('login.loginPasswordDisclaimer1') %></p>
                 <p class="loginDisclaimerText"><%- lang('login.loginPasswordDisclaimer2', { appName: lang('app.title') }) %></p>
-            </div> -->
+            </div>
         </form>
     </div>
     <script src="./assets/js/scripts/login.js"></script>

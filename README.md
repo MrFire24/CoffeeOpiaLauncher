@@ -29,13 +29,9 @@
 
 This is not an exhaustive list. Download and install the launcher to gauge all it can do!
 
-#### Need Help? [Check the wiki.][wiki]
-
-#### Like the project? Leave a ⭐ star on the repository!
-
 ## Downloads
 
-You can download from [GitHub Releases](https://github.com/MrFire24/CoffeeOpiaLauncher/releases)
+Вы можете скачать из [GitHub Релизов](https://github.com/MrFire24/CoffeeOpiaLauncher/releases)
 
 #### Latest Release
 

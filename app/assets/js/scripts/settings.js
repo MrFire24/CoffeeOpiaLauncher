@@ -974,13 +974,6 @@ document.addEventListener('keydown', async (e) => {
     if(getCurrentView() === VIEWS.settings && selectedSettingsTab === 'settingsTabMods'){
         if(e.key === 'F5'){
             await reloadDropinMods()
-        }
-    }
-})
-
-document.addEventListener('keydown', async (e) => {
-    if(getCurrentView() === VIEWS.settings && selectedSettingsTab === 'settingsTabShaders'){
-        if(e.key === 'F5'){
             saveShaderpackSettings()
             await resolveShaderpacksForUI()
         }
@@ -1469,7 +1462,7 @@ function populateAboutVersionInformation(){
  */
 function populateReleaseNotes(){
     $.ajax({
-        url: 'https://github.com/dscalzi/HeliosLauncher/releases.atom',
+        url: 'https://github.com/MrFire24/CoffeeOpiaLauncher/releases.atom',
         success: (data) => {
             const version = 'v' + remote.app.getVersion()
             const entries = $(data).find('entry')

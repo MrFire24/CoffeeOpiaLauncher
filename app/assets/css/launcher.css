@@ -600,8 +600,11 @@ body, button {
 
 /* Container which contains the forgot and remember options. */
 #loginOptions {
+    position: relative;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     width: 100%;
 }
 
@@ -1709,7 +1712,8 @@ input:checked + .toggleSwitchSlider:before {
 /* Mod elements sub-containers. */
 #settingsReqModsContainer,
 #settingsOptModsContainer,
-#settingsDropinModsContainer {
+#settingsDropinModsContainer,
+#settingsShadersContainer {
     padding-bottom: 25px;
 }
 
