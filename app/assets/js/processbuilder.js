@@ -53,7 +53,12 @@ class ProcessBuilder {
         this.usingFabricLoader = this.server.modules.some(mdl => mdl.rawModule.type === Type.Fabric)
         logger.info('Using fabric loader:', this.usingFabricLoader)
         const modObj = this.resolveModConfiguration(ConfigManager.getModConfiguration(this.server.rawServer.id).mods, this.server.modules)
-        
+
+        // Sinytra Connector: place any managed Fabric mods into the instance
+        // mods/ folder so Connector can discover them (no-op unless the pack
+        // mixes Fabric mods into a Forge/NeoForge loader).
+        this.reconcileConnectorMods(modObj.fMods)
+
         // Mod list below 1.13
         // Fabric only supports 1.14+
         if(!mcVersionAtLeast('1.13', this.server.rawServer.minecraftVersion)){
@@ -299,12 +304,100 @@ class ProcessBuilder {
     // }
 
     /**
+     * Sinytra Connector support.
+     *
+     * On a Forge/NeoForge loader, managed mods are fed to FML from the modstore
+     * via --fml.modLists. Fabric mods bridged by Sinytra Connector are NOT
+     * discovered that way — Connector scans the instance mods/ folder. So for any
+     * FabricMod modules present on a non-Fabric loader, copy their jars into
+     * <instance>/mods/ where Connector can pick them up (the same place drop-in
+     * "Files" mods live, which is why those already worked).
+     *
+     * A manifest (.lastshot-connector-mods.json) tracks the jars we placed so
+     * that, on later launches, ones that are no longer enabled/present are
+     * removed again — WITHOUT ever touching user drop-in mods: only files listed
+     * in our own manifest are eligible for removal.
+     *
+     * No-op on a Fabric loader, or when there are no FabricMod modules and no
+     * previous manifest to clean up.
+     *
+     * @param {Array.<Object>} fMods The resolved (enabled) forge/fabric modules.
+     */
+    reconcileConnectorMods(fMods) {
+        const manifestFile = path.join(this.gameDir, '.lastshot-connector-mods.json')
+        const modsDir = path.join(this.gameDir, 'mods')
+
+        const connectorMods = this.usingFabricLoader ? [] : fMods.filter(mod => mod.rawModule.type === Type.FabricMod)
+
+        // Jars we placed on the previous launch.
+        let previous = []
+        try {
+            if(fs.existsSync(manifestFile)){
+                previous = fs.readJsonSync(manifestFile)
+            }
+        } catch(err) {
+            logger.warn('[Connector] Could not read managed-mod manifest, ignoring.', err)
+        }
+
+        if(connectorMods.length === 0 && previous.length === 0){
+            return
+        }
+
+        fs.ensureDirSync(modsDir)
+
+        const current = connectorMods.map(mod => path.basename(mod.getPath()))
+
+        // Remove jars we placed before that are no longer wanted. Only files in
+        // our manifest are touched, so user drop-in mods are never removed.
+        for(const name of previous){
+            if(!current.includes(name)){
+                try {
+                    fs.removeSync(path.join(modsDir, name))
+                    logger.info(`[Connector] Removed managed Fabric mod: ${name}`)
+                } catch(err) {
+                    logger.warn(`[Connector] Failed to remove ${name}`, err)
+                }
+            }
+        }
+
+        // Copy the currently enabled Fabric mods into the mods folder.
+        for(const mdl of connectorMods){
+            const src = mdl.getPath()
+            const dest = path.join(modsDir, path.basename(src))
+            try {
+                fs.copySync(src, dest, { overwrite: true })
+            } catch(err) {
+                logger.warn(`[Connector] Failed to copy ${path.basename(src)} into mods/`, err)
+            }
+        }
+
+        // Persist the manifest (or drop it when nothing is managed anymore).
+        try {
+            if(current.length > 0){
+                fs.writeJsonSync(manifestFile, current)
+            } else if(fs.existsSync(manifestFile)){
+                fs.removeSync(manifestFile)
+            }
+        } catch(err) {
+            logger.warn('[Connector] Could not write managed-mod manifest.', err)
+        }
+
+        if(connectorMods.length > 0){
+            logger.info(`[Connector] Placed ${connectorMods.length} Fabric mod(s) into mods/ for Sinytra Connector.`)
+        }
+    }
+
+    /**
      * Construct the mod argument list for forge 1.13 and Fabric
-     * 
+     *
      * @param {Array.<Object>} mods An array of mods to add to the mod list.
      */
     constructModList(mods) {
-        const writeBuffer = mods.map(mod => {
+        // On a non-Fabric loader, Fabric mods are handled by Sinytra Connector
+        // from the mods/ folder (see reconcileConnectorMods), so keep them out of
+        // the Forge mod list — FML cannot load a raw Fabric jar directly.
+        const listMods = this.usingFabricLoader ? mods : mods.filter(mod => mod.rawModule.type !== Type.FabricMod)
+        const writeBuffer = listMods.map(mod => {
             return this.usingFabricLoader ? mod.getPath() : mod.getExtensionlessMavenIdentifier()
         }).join('\n')
 
