@@ -3954,7 +3954,7 @@ input:checked + .toggleSwitchSlider:before {
 /* Loading logo — gently pulses (zoom in/out) instead of a rotating ring. */
 #loadCenterImage {
     position: absolute;
-    width: 277px;
+    width: 350px;
     height: auto;
     transform-origin: center;
     animation: loadPulse 1.8s ease-in-out infinite;
