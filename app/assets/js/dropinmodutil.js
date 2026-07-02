@@ -16,6 +16,31 @@ const SHADER_OPTION = /shaderPack=(.+)/
 const SHADER_DIR = 'shaderpacks'
 const SHADER_CONFIG = 'optionsshaders.txt'
 
+// Manifest (in the instance dir, next to mods/) listing the Fabric jars the
+// ProcessBuilder auto-places into mods/ for Sinytra Connector. These are
+// distribution-managed mods, NOT user drop-ins, so they must be excluded from
+// the drop-in ("Files") scan. Must match ProcessBuilder.reconcileConnectorMods.
+const CONNECTOR_MANIFEST = '.lastshot-connector-mods.json'
+
+/**
+ * Read the set of Connector-managed jar names for the instance that owns
+ * modsDir. Returns an empty set if there is no manifest.
+ *
+ * @param {string} modsDir The path to the mods directory (<instance>/mods).
+ * @returns {Set.<string>} File names to treat as managed (not drop-ins).
+ */
+function getConnectorManagedMods(modsDir){
+    try {
+        const manifest = path.join(path.dirname(modsDir), CONNECTOR_MANIFEST)
+        if(fs.existsSync(manifest)){
+            return new Set(fs.readJsonSync(manifest))
+        }
+    } catch(_err) {
+        // Corrupt/unreadable manifest — treat as no managed mods.
+    }
+    return new Set()
+}
+
 /**
  * Validate that the given directory exists. If not, it is
  * created.
@@ -39,6 +64,10 @@ exports.validateDir = function(dir) {
 exports.scanForDropinMods = function(modsDir, version) {
     const modsDiscovered = []
     if(fs.existsSync(modsDir)){
+        // Fabric mods auto-placed for Sinytra Connector are managed by the
+        // distribution, not user drop-ins — hide them from the "Files" list so
+        // they aren't shown/toggled/deleted as drop-ins.
+        const managed = getConnectorManagedMods(modsDir)
         let modCandidates = fs.readdirSync(modsDir)
         let verCandidates = []
         const versionDir = path.join(modsDir, version)
@@ -46,6 +75,9 @@ exports.scanForDropinMods = function(modsDir, version) {
             verCandidates = fs.readdirSync(versionDir)
         }
         for(let file of modCandidates){
+            if(managed.has(file)){
+                continue
+            }
             const match = MOD_REGEX.exec(file)
             if(match != null){
                 modsDiscovered.push({
