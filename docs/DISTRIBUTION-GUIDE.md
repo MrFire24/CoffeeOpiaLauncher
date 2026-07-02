@@ -32,6 +32,24 @@ cd Nebula
 npm install
 ```
 
+### Enabling NeoForge support (patch)
+
+Stock Nebula does not support NeoForge. This repo ships a patch that adds a
+`--neoforge` option (see `docs/nebula/0001-neoforge-support.patch`). Apply it to
+your Nebula clone once:
+
+```
+git am < /path/to/LastShot/docs/nebula/0001-neoforge-support.patch
+# or, if git am is fussy:
+git apply /path/to/LastShot/docs/nebula/0001-neoforge-support.patch
+npm run build
+```
+
+The patch runs the official NeoForge installer headless, so a JDK (Java 21 for
+1.21.1) must be on `JAVA_EXECUTABLE`. It was verified against MC 1.21.1 /
+NeoForge 21.1.234 (schema-valid distribution, all artifacts downloaded). The
+final proof — launching the game — is on you.
+
 Create a `.env` file in the Nebula root:
 
 ```properties
@@ -105,20 +123,22 @@ Helpers: `npm run start -- latest-forge 1.21.1` / `recommended-forge 1.21.1`.
 
 ## 5. NeoForge + Sinytra Connector (important for this pack)
 
-Stock Nebula (dscalzi/master) supports **only Forge and Fabric** — there is **no
-`--neoforge` option**, and it refuses Forge+Fabric on the same server. Two
-consequences for a NeoForge + Connector pack:
+### 5a. Getting NeoForge itself — solved by the patch
+With the patch applied (§2), just pass `--neoforge`:
 
-### 5a. Getting NeoForge itself
-Options, easiest first:
-1. Use a **Nebula fork with NeoForge support** (community forks exist — verify one
-   before trusting it), or
-2. Generate a **Forge** distro and hand-swap the loader **version manifest** module
-   for the NeoForge one (the launcher launches NeoForge fine via the generic
-   "Forge 1.13+" path — it just needs the correct `mainClass`/args from the
-   manifest, which is what NeoForge's version JSON provides), or
-3. Hand-author the loader module. (2)/(3) are advanced; a NeoForge-capable Nebula
-   fork is the sane path.
+```
+npm run start -- generate server LastShotMain 1.21.1 --neoforge 21.1.234
+npm run start -- generate distro distribution
+```
+
+The resolver runs the NeoForge installer, and the launcher launches NeoForge via
+the generic "Forge 1.13+" path (it reads NeoForge's version manifest for
+mainClass/args). Latest NeoForge for 1.21.1: check
+<https://maven.neoforged.net/releases/net/neoforged/neoforge/> (21.1.x line).
+
+NeoForge mods (regular, non-Fabric) go in `forgemods/` — they load through
+`--fml.modLists`, which **NeoForge retained** (Forge 1.20.3+ removed it), so the
+launcher's normal managed-mod mechanism works for them.
 
 ### 5b. Getting the Fabric mods to load (the "Files" problem, now fixed)
 On a Forge/NeoForge pack the mods you actually run through **Sinytra Connector**

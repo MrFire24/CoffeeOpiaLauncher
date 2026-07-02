@@ -1,0 +1,526 @@
+From 5cb80b7c34cee6b20179254ee8fc4c650d32cd93 Mon Sep 17 00:00:00 2001
+From: Mr_Fire_ <vadimzhunda@gmail.com>
+Date: Thu, 2 Jul 2026 15:19:32 +0300
+Subject: [PATCH] feat: NeoForge support (generate --neoforge)
+
+Adds a NeoForge resolver that runs the NeoForge installer headless
+(--install-client) via Java, extracts the version manifest + loader jars +
+libraries, and packages them into the distribution (ForgeHosted parent +
+VersionManifest + libraries). Wires a --neoforge CLI flag, ServerMeta.neoforge,
+and Server.struct create/distro branches. NeoForge mods reuse the Forge 1.13+
+mod structure (forgemods/, Type.ForgeMod). Verified for MC 1.21.1 / NeoForge
+21.1.234: schema-valid distribution, all 50 artifacts present.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ src/index.ts                               |  12 +-
+ src/model/nebula/ServerMeta.ts             |  19 ++
+ src/resolver/neoforge/NeoForge.resolver.ts | 332 +++++++++++++++++++++
+ src/structure/spec_model/Server.struct.ts  |  49 +++
+ 4 files changed, 410 insertions(+), 2 deletions(-)
+ create mode 100644 src/resolver/neoforge/NeoForge.resolver.ts
+
+diff --git a/src/index.ts b/src/index.ts
+index 04d297c..6e0ca93 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -180,7 +180,13 @@ const generateServerCommand: CommandModule = {
+                 describe: 'Fabric version.',
+                 type: 'string'
+             })
++            .option('neoforge', {
++                describe: 'NeoForge version (without the minecraft version). Ex. 21.1.234',
++                type: 'string'
++            })
+             .conflicts('forge', 'fabric')
++            .conflicts('neoforge', 'forge')
++            .conflicts('neoforge', 'fabric')
+     },
+     handler: async (argv) => {
+         argv.root = getRoot()
+@@ -188,7 +194,8 @@ const generateServerCommand: CommandModule = {
+         logger.debug(`Root set to ${argv.root}`)
+         logger.debug(`Generating server ${argv.id} for Minecraft ${argv.version}.`,
+             `\n\t└ Forge version: ${argv.forge}`,
+-            `\n\t└ Fabric version: ${argv.fabric}`
++            `\n\t└ Fabric version: ${argv.fabric}`,
++            `\n\t└ NeoForge version: ${argv.neoforge}`
+         )
+ 
+         const minecraftVersion = new MinecraftVersion(argv.version as string)
+@@ -228,7 +235,8 @@ const generateServerCommand: CommandModule = {
+             minecraftVersion,
+             {
+                 forgeVersion: argv.forge as string,
+-                fabricVersion: argv.fabric as string
++                fabricVersion: argv.fabric as string,
++                neoforgeVersion: argv.neoforge as string
+             }
+         )
+     }
+diff --git a/src/model/nebula/ServerMeta.ts b/src/model/nebula/ServerMeta.ts
+index 16afdc1..b0e65d7 100644
+--- a/src/model/nebula/ServerMeta.ts
++++ b/src/model/nebula/ServerMeta.ts
+@@ -16,6 +16,7 @@ export interface ServerMetaOptions {
+     version?: string
+     forgeVersion?: string
+     fabricVersion?: string
++    neoforgeVersion?: string
+ }
+ 
+ export function getDefaultServerMeta(id: string, version: string, options?: ServerMetaOptions): ServerMeta {
+@@ -51,6 +52,13 @@ export function getDefaultServerMeta(id: string, version: string, options?: Serv
+         }
+     }
+ 
++    if(options?.neoforgeVersion) {
++        servMeta.meta.description = `${servMeta.meta.description} (NeoForge v${options.neoforgeVersion})`
++        servMeta.neoforge = {
++            version: options.neoforgeVersion
++        }
++    }
++
+     // Add empty untracked files.
+     servMeta.untrackedFiles = []
+ 
+@@ -96,6 +104,17 @@ export interface ServerMeta {
+         version: string
+     }
+ 
++    /**
++     * Properties related to NeoForge.
++     */
++    neoforge?: {
++        /**
++         * The NeoForge version. This does NOT include the minecraft version.
++         * Ex. 21.1.234
++         */
++        version: string
++    }
++
+     /**
+      * A list of option objects defining patterns for untracked files.
+      */
+diff --git a/src/resolver/neoforge/NeoForge.resolver.ts b/src/resolver/neoforge/NeoForge.resolver.ts
+new file mode 100644
+index 0000000..c0991ca
+--- /dev/null
++++ b/src/resolver/neoforge/NeoForge.resolver.ts
+@@ -0,0 +1,332 @@
++import { BaseResolver } from '../BaseResolver.js'
++import { RepoStructure } from '../../structure/repo/Repo.struct.js'
++import { MinecraftVersion } from '../../util/MinecraftVersion.js'
++import { LoggerUtil } from '../../util/LoggerUtil.js'
++import { JavaUtil } from '../../util/java/JavaUtil.js'
++import { MavenUtil } from '../../util/MavenUtil.js'
++import { Module, Type } from 'helios-distribution-types'
++import { VersionManifestFG3 } from '../../model/forge/VersionManifestFG3.js'
++import { pathExists, remove, mkdirs, copy } from 'fs-extra/esm'
++import { lstat, readFile, writeFile } from 'fs/promises'
++import { join, basename, dirname } from 'path'
++import { spawn } from 'child_process'
++
++/**
++ * NeoForge resolver.
++ *
++ * NeoForge (Minecraft 1.20.2+) is a fork of Forge with a nearly identical
++ * installer. Unlike Forge, its installer supports a headless client install
++ * (`--install-client <dir>`), which we use to produce the version manifest and
++ * all loader libraries locally, then package them into the distribution — the
++ * same model Nebula's ForgeGradle3 adapter uses for Forge 1.20.3+.
++ *
++ * The game is launched by Helios via the version manifest's mainClass
++ * (cpw.mods.bootstraplauncher.BootstrapLauncher) + arguments; FML then locates
++ * the NeoForge universal/client jars in the library directory by the
++ * `--fml.neoForgeVersion` coordinate. So the distribution must ship:
++ *   - the version.json (Type.VersionManifest),
++ *   - the processor-produced net.neoforged:neoforge:<ver>:{universal,client} jars,
++ *   - every library listed in the version.json (all carry download URLs).
++ *
++ * The parent module is the NeoForge universal jar (Type.ForgeHosted) so Helios
++ * treats it as the (non-Fabric) loader and reads the attached version manifest.
++ */
++export class NeoForgeResolver extends BaseResolver {
++
++    private static readonly logger = LoggerUtil.getLogger('NeoForgeResolver')
++
++    public static readonly NEOFORGE_GROUP = 'net.neoforged'
++    public static readonly NEOFORGE_ARTIFACT = 'neoforge'
++    protected readonly REMOTE_REPOSITORY = 'https://maven.neoforged.net/releases/'
++
++    protected repoStructure: RepoStructure
++    protected artifactVersion: string
++
++    // eslint-disable-next-line @typescript-eslint/no-unused-vars
++    public static isForVersion(version: MinecraftVersion, libraryVersion: string): boolean {
++        // NeoForge exists for Minecraft 1.20.2 and up.
++        return version.isGreaterThanOrEqualTo(new MinecraftVersion('1.20.2'))
++    }
++
++    constructor(
++        absoluteRoot: string,
++        relativeRoot: string,
++        baseUrl: string,
++        protected minecraftVersion: MinecraftVersion,
++        protected neoforgeVersion: string,
++        protected discardOutput: boolean,
++        protected invalidateCache: boolean
++    ) {
++        super(absoluteRoot, relativeRoot, baseUrl)
++        this.repoStructure = new RepoStructure(absoluteRoot, relativeRoot, 'neoforge')
++        this.artifactVersion = neoforgeVersion
++    }
++
++    public isForVersion(version: MinecraftVersion, libraryVersion: string): boolean {
++        return NeoForgeResolver.isForVersion(version, libraryVersion)
++    }
++
++    public async getModule(): Promise<Module> {
++        return this.process()
++    }
++
++    private get installerFileName(): string {
++        return `neoforge-${this.neoforgeVersion}-installer.jar`
++    }
++
++    // The version id NeoForge's own installer writes (versions/<id>/<id>.json).
++    private get internalVersionName(): string {
++        return `neoforge-${this.neoforgeVersion}`
++    }
++
++    private getCacheDirectory(): string {
++        return join(this.repoStructure.getCacheDirectory(), 'neoforge', this.neoforgeVersion)
++    }
++
++    private async process(): Promise<Module> {
++        const libRepo = this.repoStructure.getLibRepoStruct()
++
++        // Download the installer if not present locally.
++        const installerPath = libRepo.getArtifactByComponents(
++            NeoForgeResolver.NEOFORGE_GROUP,
++            NeoForgeResolver.NEOFORGE_ARTIFACT,
++            this.artifactVersion, 'installer', 'jar'
++        )
++        if (!await libRepo.artifactExists(installerPath)) {
++            NeoForgeResolver.logger.debug('NeoForge installer not found locally, downloading..')
++            await libRepo.downloadArtifactByComponents(
++                this.REMOTE_REPOSITORY,
++                NeoForgeResolver.NEOFORGE_GROUP,
++                NeoForgeResolver.NEOFORGE_ARTIFACT,
++                this.artifactVersion, 'installer', 'jar'
++            )
++        } else {
++            NeoForgeResolver.logger.debug('Using locally discovered NeoForge installer.')
++        }
++
++        return this.processWithInstaller(installerPath)
++    }
++
++    private async processWithInstaller(installerPath: string): Promise<Module> {
++
++        const installerOutputDir = this.getCacheDirectory()
++
++        let doInstall = true
++        if (await pathExists(installerOutputDir)) {
++            if (this.invalidateCache) {
++                NeoForgeResolver.logger.info(`Removing existing cache ${installerOutputDir}..`)
++                await remove(installerOutputDir)
++                await mkdirs(installerOutputDir)
++            } else {
++                doInstall = false
++                NeoForgeResolver.logger.info(`Using cached results at ${installerOutputDir}.`)
++            }
++        } else {
++            await mkdirs(installerOutputDir)
++        }
++
++        if (doInstall) {
++            const workingInstaller = join(installerOutputDir, basename(installerPath))
++            await copy(installerPath, workingInstaller)
++            // Required for the installer to function.
++            await writeFile(join(installerOutputDir, 'launcher_profiles.json'), JSON.stringify({}))
++            NeoForgeResolver.logger.info('Running NeoForge installer (headless client install)..')
++            await this.executeInstaller(workingInstaller, installerOutputDir)
++        }
++
++        await this.verifyInstallerRan(installerOutputDir)
++
++        NeoForgeResolver.logger.debug('Processing NeoForge version manifest.')
++        const [versionManifest, versionManifestModule] = await this.processVersionManifest(installerOutputDir)
++
++        NeoForgeResolver.logger.debug('Processing NeoForge loader jars.')
++        const neoforgeModule = await this.processNeoForgeModule(installerOutputDir)
++
++        // Attach version.json and then all libraries.
++        neoforgeModule.subModules!.unshift(versionManifestModule)
++        const libs = await this.processLibraries(versionManifest, installerOutputDir)
++        neoforgeModule.subModules = neoforgeModule.subModules!.concat(libs)
++
++        if (this.discardOutput) {
++            NeoForgeResolver.logger.info(`Removing installer output at ${installerOutputDir}..`)
++            await remove(installerOutputDir)
++        }
++
++        return neoforgeModule
++    }
++
++    private getVersionManifestPath(installerOutputDir: string): string {
++        const name = this.internalVersionName
++        return join(installerOutputDir, 'versions', name, `${name}.json`)
++    }
++
++    private async verifyInstallerRan(installerOutputDir: string): Promise<void> {
++        if (!await pathExists(this.getVersionManifestPath(installerOutputDir))) {
++            await remove(installerOutputDir)
++            throw new Error('NeoForge installer did not produce a version manifest. Installation failed.')
++        }
++    }
++
++    private async processVersionManifest(installerOutputDir: string): Promise<[VersionManifestFG3, Module]> {
++        const versionRepo = this.repoStructure.getVersionRepoStruct()
++        const versionManifestPath = this.getVersionManifestPath(installerOutputDir)
++
++        const versionManifestBuf = await readFile(versionManifestPath)
++        const versionManifest = JSON.parse(versionManifestBuf.toString()) as VersionManifestFG3
++
++        const versionManifestModule: Module = {
++            id: this.artifactVersion,
++            name: 'Minecraft NeoForge (version.json)',
++            type: Type.VersionManifest,
++            artifact: this.generateArtifact(
++                versionManifestBuf,
++                await lstat(versionManifestPath),
++                versionRepo.getVersionManifestURL(this.baseUrl, this.minecraftVersion, this.neoforgeVersion)
++            )
++        }
++
++        const destination = versionRepo.getVersionManifest(this.minecraftVersion, this.neoforgeVersion)
++        await copy(versionManifestPath, destination, { overwrite: true })
++
++        return [versionManifest, versionManifestModule]
++    }
++
++    // Package the processor-produced neoforge universal (loader parent) + client jars.
++    private async processNeoForgeModule(installerOutputDir: string): Promise<Module> {
++        const libDir = join(installerOutputDir, 'libraries')
++        const libRepo = this.repoStructure.getLibRepoStruct()
++
++        const classifiers = ['universal', 'client']
++        const mdls: Module[] = []
++
++        for (const classifier of classifiers) {
++            const localPath = join(
++                libDir,
++                MavenUtil.mavenComponentsAsNormalizedPath(
++                    NeoForgeResolver.NEOFORGE_GROUP,
++                    NeoForgeResolver.NEOFORGE_ARTIFACT,
++                    this.artifactVersion,
++                    classifier
++                )
++            )
++
++            if (!await pathExists(localPath)) {
++                throw new Error(`Expected NeoForge ${classifier} jar not found at ${localPath}`)
++            }
++
++            mdls.push({
++                id: MavenUtil.mavenComponentsToIdentifier(
++                    NeoForgeResolver.NEOFORGE_GROUP,
++                    NeoForgeResolver.NEOFORGE_ARTIFACT,
++                    this.artifactVersion,
++                    classifier
++                ),
++                name: `Minecraft NeoForge (${classifier})`,
++                type: Type.Library,
++                // The universal/client jars are located by FML via
++                // --fml.neoForgeVersion, not placed on the JVM classpath directly.
++                classpath: false,
++                artifact: this.generateArtifact(
++                    await readFile(localPath),
++                    await lstat(localPath),
++                    libRepo.getArtifactUrlByComponents(
++                        this.baseUrl,
++                        NeoForgeResolver.NEOFORGE_GROUP,
++                        NeoForgeResolver.NEOFORGE_ARTIFACT,
++                        this.artifactVersion,
++                        classifier
++                    )
++                ),
++                subModules: []
++            })
++
++            const destination = libRepo.getArtifactByComponents(
++                NeoForgeResolver.NEOFORGE_GROUP,
++                NeoForgeResolver.NEOFORGE_ARTIFACT,
++                this.artifactVersion,
++                classifier
++            )
++            await copy(localPath, destination, { overwrite: true })
++        }
++
++        // universal jar is the loader parent module.
++        const neoforgeModule = mdls.shift()!
++        neoforgeModule.type = Type.ForgeHosted
++        neoforgeModule.subModules = mdls
++        return neoforgeModule
++    }
++
++    private async processLibraries(manifest: VersionManifestFG3, installerOutputDir: string): Promise<Module[]> {
++        const libDir = join(installerOutputDir, 'libraries')
++        const libRepo = this.repoStructure.getLibRepoStruct()
++        const mdls: Module[] = []
++
++        for (const entry of manifest.libraries) {
++            const artifact = entry.downloads.artifact
++            if (!artifact.url) {
++                continue
++            }
++
++            const targetLocalPath = join(libDir, artifact.path)
++            if (!await pathExists(targetLocalPath)) {
++                throw new Error(`Expected NeoForge library ${entry.name} not found at ${targetLocalPath}`)
++            }
++
++            const components = MavenUtil.getMavenComponents(entry.name)
++
++            mdls.push({
++                id: entry.name,
++                name: `Minecraft NeoForge (${components.artifact})`,
++                type: Type.Library,
++                artifact: this.generateArtifact(
++                    await readFile(targetLocalPath),
++                    await lstat(targetLocalPath),
++                    libRepo.getArtifactUrlByComponents(
++                        this.baseUrl,
++                        components.group,
++                        components.artifact,
++                        components.version,
++                        components.classifier,
++                        components.extension
++                    )
++                )
++            })
++
++            const destination = libRepo.getArtifactByComponents(
++                components.group,
++                components.artifact,
++                components.version,
++                components.classifier,
++                components.extension
++            )
++            await copy(targetLocalPath, destination, { overwrite: true })
++        }
++
++        return mdls
++    }
++
++    private executeInstaller(installerExec: string, outputDir: string): Promise<void> {
++        return new Promise((resolve, reject) => {
++            const fiLogger = LoggerUtil.getLogger('NeoForge Installer')
++            const child = spawn(JavaUtil.getJavaExecutable(), [
++                '-jar',
++                installerExec,
++                '--install-client',
++                outputDir
++            ], {
++                cwd: dirname(installerExec)
++            })
++            child.stdout.on('data', (data) => fiLogger.info(data.toString('utf8').trim()))
++            child.stderr.on('data', (data) => fiLogger.error(data.toString('utf8').trim()))
++            child.on('close', code => {
++                if (code === 0) {
++                    fiLogger.info('Installer finished successfully.')
++                    resolve()
++                } else {
++                    reject(new Error(`NeoForge installer exited with code ${code}.`))
++                }
++            })
++        })
++    }
++
++}
+diff --git a/src/structure/spec_model/Server.struct.ts b/src/structure/spec_model/Server.struct.ts
+index c5ca866..80650f5 100644
+--- a/src/structure/spec_model/Server.struct.ts
++++ b/src/structure/spec_model/Server.struct.ts
+@@ -13,6 +13,7 @@ import { MinecraftVersion } from '../../util/MinecraftVersion.js'
+ import { addSchemaToObject, SchemaTypes } from '../../util/SchemaUtil.js'
+ import { isValidUrl } from '../../util/StringUtils.js'
+ import { FabricResolver } from '../../resolver/fabric/Fabric.resolver.js'
++import { NeoForgeResolver } from '../../resolver/neoforge/NeoForge.resolver.js'
+ 
+ export interface CreateServerResult {
+     modContainer?: string
+@@ -56,6 +57,7 @@ export class ServerStructure extends BaseModelStructure<Server> {
+             version?: string
+             forgeVersion?: string
+             fabricVersion?: string
++            neoforgeVersion?: string
+         }
+     ): Promise<CreateServerResult | null> {
+         const effectiveId = ServerStructure.getEffectiveId(id, minecraftVersion)
+@@ -101,6 +103,22 @@ export class ServerStructure extends BaseModelStructure<Server> {
+             serverMetaOpts.fabricVersion = options.fabricVersion
+         }
+ 
++        if (options.neoforgeVersion != null) {
++            // NeoForge mods use the Forge 1.13+ format, so we reuse the forge
++            // mod structure (the `forgemods` folder / Type.ForgeMod).
++            const fms = VersionSegmentedRegistry.getForgeModStruct(
++                minecraftVersion,
++                options.neoforgeVersion,
++                absoluteServerRoot,
++                relativeServerRoot,
++                this.baseUrl,
++                []
++            )
++            await fms.init()
++            modContainer = fms.getContainerDirectory()
++            serverMetaOpts.neoforgeVersion = options.neoforgeVersion
++        }
++
+         const serverMeta: ServerMeta = addSchemaToObject(
+             getDefaultServerMeta(id, minecraftVersion.toString(), serverMetaOpts),
+             SchemaTypes.ServerMetaSchema,
+@@ -221,6 +239,37 @@ export class ServerStructure extends BaseModelStructure<Server> {
+                     modules.push(...fabricModModules)
+                 }
+ 
++                if(serverMeta.neoforge) {
++                    const neoforgeResolver = new NeoForgeResolver(
++                        dirname(this.containerDirectory),
++                        '',
++                        this.baseUrl,
++                        minecraftVersion,
++                        serverMeta.neoforge.version,
++                        this.discardOutput,
++                        this.invalidateCache
++                    )
++                    if (!neoforgeResolver.isForVersion(minecraftVersion, serverMeta.neoforge.version)) {
++                        throw new Error(`NeoForge resolver does not support Minecraft ${minecraftVersion}!`)
++                    }
++
++                    const neoforgeModule = await neoforgeResolver.getModule()
++                    modules.push(neoforgeModule)
++
++                    // NeoForge mods use the Forge 1.13+ format (Type.ForgeMod).
++                    const neoforgeModStruct = VersionSegmentedRegistry.getForgeModStruct(
++                        minecraftVersion,
++                        serverMeta.neoforge.version,
++                        absoluteServerRoot,
++                        relativeServerRoot,
++                        this.baseUrl,
++                        untrackedFiles
++                    )
++
++                    const neoforgeModModules = await neoforgeModStruct.getSpecModel()
++                    modules.push(...neoforgeModModules)
++                }
++
+                 const libraryStruct = new LibraryStructure(absoluteServerRoot, relativeServerRoot, this.baseUrl, minecraftVersion, untrackedFiles)
+                 const libraryModules = await libraryStruct.getSpecModel()
+                 modules.push(...libraryModules)
+-- 
+2.54.0.windows.1
+
