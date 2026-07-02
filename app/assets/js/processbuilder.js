@@ -360,11 +360,16 @@ class ProcessBuilder {
             }
         }
 
-        // Copy the currently enabled Fabric mods into the mods folder.
+        // Copy the currently enabled Fabric mods into the mods folder. Skip the
+        // copy when an identical jar (same size) is already there, so we don't
+        // rewrite the file on every launch.
         for(const mdl of connectorMods){
             const src = mdl.getPath()
             const dest = path.join(modsDir, path.basename(src))
             try {
+                if(fs.existsSync(dest) && fs.statSync(dest).size === fs.statSync(src).size){
+                    continue
+                }
                 fs.copySync(src, dest, { overwrite: true })
             } catch(err) {
                 logger.warn(`[Connector] Failed to copy ${path.basename(src)} into mods/`, err)
