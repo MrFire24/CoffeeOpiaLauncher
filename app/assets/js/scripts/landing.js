@@ -640,6 +640,18 @@ async function dlAsync(login = true) {
  * News Loading Functions
  */
 
+/**
+ * News feature toggle.
+ *
+ * Set to true to enable the News UI — the "News" button and the article
+ * slide-in panel. It requires an `rss` feed URL in the distribution
+ * (distribution.json -> `rss`). Kept false for now because no feed is
+ * configured yet; flip this single flag to true to re-enable everything
+ * (button shown, articles fetched, alert dot active). loadNews() also
+ * degrades gracefully if the distribution has no `rss` entry.
+ */
+const NEWS_ENABLED = false
+
 // DOM Cache
 const newsContent                   = document.getElementById('newsContent')
 const newsArticleTitle              = document.getElementById('newsArticleTitle')
@@ -703,8 +715,13 @@ function slide_(up){
     }
 }
 
-// Bind news button.
-document.getElementById('newsButton').onclick = () => {
+// Bind news button (only when the news feature is enabled; otherwise hide it
+// so the launch area matches the no-news layout — and avoid a null deref).
+const newsButtonEl = document.getElementById('newsButton')
+if(!NEWS_ENABLED && newsButtonEl){
+    newsButtonEl.style.display = 'none'
+}
+if(NEWS_ENABLED && newsButtonEl) newsButtonEl.onclick = () => {
     // Toggle tabbing.
     if(newsActive){
         $('#landingContainer *').removeAttr('tabindex')
@@ -816,6 +833,11 @@ async function digestMessage(str) {
  * content has finished loading and transitioning.
  */
 async function initNews(){
+
+    // News feature is toggled off — skip loading entirely (see NEWS_ENABLED).
+    if(!NEWS_ENABLED){
+        return
+    }
 
     setNewsLoading(true)
 
