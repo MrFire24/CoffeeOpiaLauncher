@@ -185,6 +185,38 @@ exports.REMOTE_DISTRO_URL = 'https://your-host.example/distribution.json'
 
 ---
 
+## 6b. Why some mods get "silently ignored" (and how to avoid it)
+
+Nebula can drop or mis-handle mods without an obvious error. The real causes,
+from reading the source + issue tracker:
+
+1. **Mod in the wrong folder (most common).** Only `required/`, `optionalon/`
+   and `optionaloff/` are scanned — a jar dropped directly in `forgemods/` (or
+   `fabricmods/`) is never seen. The patched Nebula now prints a
+   `Ignoring "<file>" …` warning for these; move them into a subfolder.
+2. **Duplicate resolved id → overwrite.** Two mods that resolve to the same
+   `group:id:version` map to the same modstore path, so one overwrites the other.
+   This hits small/library-ish/Fabric-converted mods whose metadata can't be
+   read, so they fall back to `generated.forgemod:<filename>`. The patched Nebula
+   now warns `Duplicate module id …`. Fix: give them real metadata (below) or
+   rename so ids differ.
+3. **Metadata not resolvable.** A mod with no `mods.toml`/`neoforge.mods.toml`
+   (pure library, coremod, or a Fabric mod dropped into `forgemods/`) can't be
+   identified; Nebula falls back to a filename guess. Combined with (2) this is
+   where "small library" mods vanish. Fixes: put real NeoForge mods (with
+   `neoforge.mods.toml`) in `forgemods/`; put Fabric mods in `fabricmods/` (or,
+   for Connector, ship them as `Type.File` → `mods/`, see §5b); ship plain
+   libraries as `Type.Library` (the `libraries/` folder), not as mods.
+4. **Claritas crash aborts generation (loud, but easy to miss).** Certain jars
+   make the metadata tool (Claritas) throw (issues #41, #48), which fails the
+   whole `generate distro`. If you didn't notice, you keep shipping an older
+   distribution and it looks like "some mods went missing." Watch the log for
+   `Claritas finished with non-zero exit code` / `Failed to generate distribution`.
+   Workaround: remove/replace the offending jar, or update Claritas.
+
+Rule of thumb: **read the `generate distro` log.** With the patched Nebula, the
+new warnings surface exactly these cases instead of failing silently.
+
 ## 7. Quick checklist
 
 1. Install Nebula, fill `.env` (`BASE_URL` = your host).

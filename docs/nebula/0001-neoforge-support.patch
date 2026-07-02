@@ -1,7 +1,7 @@
 From 5cb80b7c34cee6b20179254ee8fc4c650d32cd93 Mon Sep 17 00:00:00 2001
 From: Mr_Fire_ <vadimzhunda@gmail.com>
 Date: Thu, 2 Jul 2026 15:19:32 +0300
-Subject: [PATCH] feat: NeoForge support (generate --neoforge)
+Subject: [PATCH 1/2] feat: NeoForge support (generate --neoforge)
 
 Adds a NeoForge resolver that runs the NeoForge installer headless
 (--install-client) via Java, extracts the version manifest + loader jars +
@@ -521,6 +521,132 @@ index c5ca866..80650f5 100644
                  const libraryStruct = new LibraryStructure(absoluteServerRoot, relativeServerRoot, this.baseUrl, minecraftVersion, untrackedFiles)
                  const libraryModules = await libraryStruct.getSpecModel()
                  modules.push(...libraryModules)
+-- 
+2.54.0.windows.1
+
+
+From f9a2620c9457977a75b7b5599e531c8948c988e2 Mon Sep 17 00:00:00 2001
+From: Mr_Fire_ <vadimzhunda@gmail.com>
+Date: Thu, 2 Jul 2026 15:41:13 +0300
+Subject: [PATCH 2/2] fix(mods): stop silently ignoring mods; read
+ neoforge.mods.toml
+
+Three fixes for mods that Nebula would silently drop or mis-handle:
+- Read META-INF/neoforge.mods.toml (NeoForge 1.20.5+) with fallback to
+  META-INF/mods.toml, so NeoForge mods get their real id/name/version instead
+  of a filename guess.
+- Warn about jars placed directly in the forge/neoforge mods folder root: only
+  the required/optionalon/optionaloff subfolders are scanned, so such files were
+  silently ignored.
+- Warn on duplicate resolved maven identifiers (same modstore path -> one
+  overwrites the other), which mainly hits small/library/Fabric-converted mods
+  whose metadata cannot be resolved.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ .../spec_model/module/Module.struct.ts         | 18 +++++++++++++++++-
+ .../module/ToggleableModule.struct.ts          |  9 +++++++++
+ .../module/forgemod/ForgeMod113.struct.ts      | 18 ++++++++++++++----
+ 3 files changed, 40 insertions(+), 5 deletions(-)
+
+diff --git a/src/structure/spec_model/module/Module.struct.ts b/src/structure/spec_model/module/Module.struct.ts
+index e6004e5..16b62a4 100644
+--- a/src/structure/spec_model/module/Module.struct.ts
++++ b/src/structure/spec_model/module/Module.struct.ts
+@@ -191,15 +191,31 @@ export abstract class ModuleStructure extends BaseModelStructure<Module> {
+             await this.invokeClaritas(moduleCandidates)
+     
+             // Process Modules
++            const idToFile = new Map<string, string>()
+             for(const candidate of moduleCandidates) {
+                 options?.preProcess?.(candidate)
+                 const mdl = await this.parseModule(candidate.file, candidate.filePath, candidate.stats)
+                 options?.postProcess?.(mdl)
++
++                // Two modules resolving to the same maven identifier map to the
++                // same modstore path — one would silently overwrite the other.
++                // This commonly hits small/library/Fabric-converted mods whose
++                // metadata cannot be resolved, so they fall back to a generated
++                // group + filename-derived id. Warn so it is not silent.
++                const existing = idToFile.get(mdl.id)
++                if(existing != null) {
++                    this.logger.warn(`Duplicate module id "${mdl.id}" from "${candidate.file}" and "${existing}". `
++                        + 'One will overwrite the other. This usually means metadata could not be resolved '
++                        + '(bad/missing mods.toml, Claritas failure). Verify both mods are included correctly.')
++                } else {
++                    idToFile.set(mdl.id, candidate.file)
++                }
++
+                 accumulator.push(mdl)
+             }
+ 
+         }
+-        
++
+         return accumulator
+ 
+     }
+diff --git a/src/structure/spec_model/module/ToggleableModule.struct.ts b/src/structure/spec_model/module/ToggleableModule.struct.ts
+index ef8c895..db593dc 100644
+--- a/src/structure/spec_model/module/ToggleableModule.struct.ts
++++ b/src/structure/spec_model/module/ToggleableModule.struct.ts
+@@ -50,6 +50,15 @@ export abstract class ToggleableModuleStructure extends ModuleStructure {
+                 moduleCandidates.push(...(await super._doModuleDiscovery(resolve(this.containerDirectory, value))).map(val => ({...val, namespace: value})))
+             }
+ 
++            // Only the required/optionalon/optionaloff subfolders are scanned.
++            // Warn about any files dropped directly in the module folder root,
++            // which would otherwise be SILENTLY IGNORED.
++            const stray = await super._doModuleDiscovery(this.containerDirectory)
++            for(const s of stray) {
++                this.logger.warn(`Ignoring "${s.file}" — it is directly in ${this.containerDirectory} instead of a `
++                    + 'required/optionalon/optionaloff subfolder. Move it into one of those to include it.')
++            }
++
+             this.resolvedModels = await this._doModuleRetrieval(moduleCandidates, {
+                 preProcess: (candidate) => {
+                     this.activeNamespace = (candidate as ToggleableModuleCandidate).namespace
+diff --git a/src/structure/spec_model/module/forgemod/ForgeMod113.struct.ts b/src/structure/spec_model/module/forgemod/ForgeMod113.struct.ts
+index a74ac32..3828305 100644
+--- a/src/structure/spec_model/module/forgemod/ForgeMod113.struct.ts
++++ b/src/structure/spec_model/module/forgemod/ForgeMod113.struct.ts
+@@ -75,11 +75,21 @@ export class ForgeModStructure113 extends BaseForgeModStructure<ModsToml> {
+             return this.modMetadata[name]
+         }
+ 
++        // NeoForge (Minecraft 1.20.5+) renamed mods.toml to neoforge.mods.toml.
++        // Try the NeoForge name first, then fall back to the Forge name so this
++        // structure handles both Forge and NeoForge mods.
+         let raw: Buffer | undefined
++        let tomlName = 'META-INF/neoforge.mods.toml'
+         try {
+-            raw = zip.entryDataSync('META-INF/mods.toml')
++            raw = zip.entryDataSync('META-INF/neoforge.mods.toml')
+         } catch(err) {
+-            // ignored
++            // Not a NeoForge mod, try the Forge name.
++            try {
++                raw = zip.entryDataSync('META-INF/mods.toml')
++                tomlName = 'META-INF/mods.toml'
++            } catch(err2) {
++                // ignored
++            }
+         }
+ 
+         if (raw) {
+@@ -87,10 +97,10 @@ export class ForgeModStructure113 extends BaseForgeModStructure<ModsToml> {
+                 const parsed = toml.parse(raw.toString()) as ModsToml
+                 this.modMetadata[name] = parsed
+             } catch (err) {
+-                this.logger.error(`ForgeMod ${name} contains an invalid mods.toml file.`)
++                this.logger.error(`ForgeMod ${name} contains an invalid ${tomlName} file.`)
+             }
+         } else {
+-            this.logger.error(`ForgeMod ${name} does not contain mods.toml file.`)
++            this.logger.error(`ForgeMod ${name} does not contain a mods.toml or neoforge.mods.toml file.`)
+         }
+ 
+         const cRes = this.claritasResult?.[path]
 -- 
 2.54.0.windows.1
 
