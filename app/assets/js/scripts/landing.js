@@ -812,7 +812,7 @@ let newsAlertShown = false
  */
 function showNewsAlert(){
     newsAlertShown = true
-    $(newsButtonAlert).fadeIn(250)
+    $('#newsButtonAlert').fadeIn(250)
 }
 
 async function digestMessage(str) {
