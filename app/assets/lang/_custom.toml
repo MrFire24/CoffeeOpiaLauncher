@@ -2,6 +2,7 @@
 
 [ejs.app]
 title = "LastShot"
+windowTitle = "LastShot Launcher"
 
 [ejs.landing]
 mediaGitHubURL = "https://github.com/MrFire24/CoffeeOpiaLauncher"
