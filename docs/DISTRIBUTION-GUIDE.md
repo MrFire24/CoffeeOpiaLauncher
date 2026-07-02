@@ -144,12 +144,12 @@ launcher's normal managed-mod mechanism works for them.
 On a Forge/NeoForge pack the mods you actually run through **Sinytra Connector**
 are Fabric mods. Pick ONE of:
 
-- **A — `FabricMod` + this launcher's fix (recommended).** Put the Fabric mods in
-  `fabricmods/` so they become `Type.FabricMod`. LastShot's `reconcileConnectorMods`
-  copies them into the instance `mods/` folder where Connector finds them, and they
-  show up as toggleable mods in the UI. Caveat: stock Nebula won't put `fabricmods`
-  into a Forge server, so you'll need a Nebula fork that allows it, or hand-add the
-  `FabricMod` entries to `distribution.json` after generating.
+- **A — `FabricMod` + this launcher's fix.** As `Type.FabricMod` modules,
+  LastShot's `reconcileConnectorMods` copies them into the instance `mods/` folder
+  where Connector finds them, and they show up as toggleable mods in the UI.
+  Caveat: a `--neoforge` server (this repo's patch) scans `forgemods/` only, not
+  `fabricmods/`, so to get `FabricMod` entries you must hand-add them to the
+  generated `distribution.json`. If you don't want to edit JSON, use approach B.
 - **B — `Type.File` (works on any launcher, no fix needed).** Declare each Fabric
   mod as a `File` module with path `mods/<name>.jar`. The launcher downloads it
   straight into the instance `mods/` folder → Connector loads it. Downside: not
