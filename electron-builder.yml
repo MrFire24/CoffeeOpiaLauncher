@@ -25,6 +25,10 @@ nsis:
   perMachine: false
   allowElevation: true
   allowToChangeInstallationDirectory: true
+  # Dedicated installer artwork (distinct from the app/launcher icon).
+  installerIcon: 'build/installerIcon.ico'
+  uninstallerIcon: 'build/installerIcon.ico'
+  installerHeaderIcon: 'build/installerIcon.ico'
 
 # macOS Configuration
 mac:
