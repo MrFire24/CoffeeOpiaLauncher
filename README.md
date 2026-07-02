@@ -1,10 +1,10 @@
 <p align="center"><img src="./app/assets/images/SealCircle.png" width="150px" height="150px" alt="aventium softworks"></p>
 
-<h1 align="center">CoffeeOpia Launcher</h1>
+<h1 align="center">LastShot</h1>
 
 <!-- [<p align="center"><img src="https://img.shields.io/github/actions/workflow/status/dscalzi/HeliosLauncher/build.yml?branch=master&style=for-the-badge" alt="gh actions">](https://github.com/dscalzi/HeliosLauncher/actions) [<img src="https://img.shields.io/github/downloads/dscalzi/HeliosLauncher/total.svg?style=for-the-badge" alt="downloads">](https://github.com/dscalzi/HeliosLauncher/releases) <img src="https://forthebadge.com/images/badges/winter-is-coming.svg"  height="28px" alt="winter-is-coming"></p> -->
 
-Присоединяйся к [Кофеопии](https://discord.gg/E67j4T9z) используя наш лаучер.
+Присоединяйся используя наш лаунчер [LastShot](https://discord.gg/E67j4T9z).
 
 ![Screenshot 1](https://media.discordapp.net/attachments/1119401827084009515/1398699465166159963/image.png?ex=68864fe3&is=6884fe63&hm=92ffbc6372eca9857d11e4c55b8cc2a2b884405e78ced9df92ec433c76c431ed&=&format=webp&quality=lossless)
 ![Screenshot 2](https://media.discordapp.net/attachments/1119401827084009515/1398699465619275776/image.png?ex=68864fe3&is=6884fe63&hm=b4eb601de36ac972d4e4de564cfff02fb065ec52eea5a01b42fbda78d7679ae9&=&format=webp&quality=lossless)

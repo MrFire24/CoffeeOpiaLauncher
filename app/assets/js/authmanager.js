@@ -143,25 +143,25 @@ function mojangErrorDisplayable(errorCode) {
 //exports.addMojangAccount = async function(username, password) {
 exports.addMojangAccount = async function(username) {
     //const onlineUrl = `https://api.mojang.com/users/profiles/minecraft/${username}`;
-	const offlineUrl = `http://tools.glowingmines.eu/convertor/nick/${username}`;
+    const offlineUrl = `http://tools.glowingmines.eu/convertor/nick/${username}`
     try {
         //const response = await MojangRestAPI.authenticate(username, password, ConfigManager.getClientToken())
         //console.log(response)
         //if(response.responseStatus === RestResponseStatus.SUCCESS) {
         
         //const res = await fetch(onlineUrl);
-		//const data = await res.json();
+        //const data = await res.json();
         let player_uuid
 
         if (false) {//(data && data.id) {
-            const formatted = data.id.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5');
-			log.info(`✅ [ONLINE] UUID for ${username}: ${formatted}`)
-			player_uuid = formatted
+            const formatted = data.id.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5')
+            log.info(`✅ [ONLINE] UUID for ${username}: ${formatted}`)
+            player_uuid = formatted
         } else {
-		    const fallback = await fetch(offlineUrl).then(r => r.json());
-		    player_uuid = fallback.offlinesplitteduuid;
-            log.info(`Offline UUID for ${username}: ${player_uuid}`);
-		}
+            const fallback = await fetch(offlineUrl).then(r => r.json())
+            player_uuid = fallback.offlinesplitteduuid
+            log.info(`Offline UUID for ${username}: ${player_uuid}`)
+        }
         const ret = ConfigManager.addMojangAuthAccount(player_uuid, 111, username, username)
         ConfigManager.setClientToken(222)
         ConfigManager.save()
@@ -327,16 +327,16 @@ exports.removeMicrosoftAccount = async function(uuid){
 async function validateSelectedMojangAccount(){
     const current = ConfigManager.getSelectedAccount()
     const curr_username = current.username
-    const offlineUrl = `http://tools.glowingmines.eu/convertor/nick/${curr_username}`;
-    const fallback = await fetch(offlineUrl).then(r => r.json());
-    const acc_uuid = fallback.offlinesplitteduuid;
+    const offlineUrl = `http://tools.glowingmines.eu/convertor/nick/${curr_username}`
+    const fallback = await fetch(offlineUrl).then(r => r.json())
+    const acc_uuid = fallback.offlinesplitteduuid
     if (current.uuid != acc_uuid){
         ConfigManager.removeAuthAccount(current.uuid)
         ConfigManager.save()
         ConfigManager.addMojangAuthAccount(acc_uuid, 111, curr_username, curr_username)
         ConfigManager.setClientToken(222)
         ConfigManager.save()
-        setSelectedAccount(acc_uuid)
+        ConfigManager.setSelectedAccount(acc_uuid)
     }
     return true
     const response = await MojangRestAPI.validate(current.accessToken, ConfigManager.getClientToken())

@@ -1,7 +1,7 @@
 # Custom Language File for Launcher Customizer
 
 [ejs.app]
-title = "CoffeeOpia Launcher"
+title = "LastShot"
 
 [ejs.landing]
 mediaGitHubURL = "https://github.com/MrFire24/CoffeeOpiaLauncher"
@@ -15,8 +15,8 @@ sourceGithubLink = "https://github.com/MrFire24/CoffeeOpiaLauncher"
 supportLink = "https://github.com/MrFire24/CoffeeOpiaLauncher/issues"
 
 [ejs.welcome]
-welcomeHeader = "Добро Пожаловать CoffeeOpia"
-welcomeDescription = "Кофеопия это майнкрафт сервер ценитель кофе ☕<br>
-Здесь вы найдёте новых друзей и просто товарищей по кофе 🍪<br>
-Каждый может стать частью нашего сервера и сделать из него нечто большое чем просто сервер по Майнкрафту ✨"
-welcomeDescCTA = "Вы всего в паре кликов от Кофеопии."
+welcomeHeader = "Добро пожаловать в LastShot"
+welcomeDescription = "LastShot — лаунчер для модифицированного Minecraft 🍹<br>
+Все моды, конфиги и обновления ставятся и обновляются автоматически ✨<br>
+Тебе остаётся только войти и играть 🎮"
+welcomeDescCTA = "Ты всего в паре кликов от игры."

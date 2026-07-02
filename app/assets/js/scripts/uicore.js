@@ -48,7 +48,7 @@ if(!isDev){
                 loggerAutoUpdater.info('New update available', info.version)
                 
                 if(process.platform === 'darwin'){
-                    info.darwindownload = `https://github.com/MrFire24/CoffeeOpiaLauncher/releases/download/v${info.version}/CoffeeOpia-Launcher-setup-${info.version}${process.arch === 'arm64' ? '-arm64' : '-x64'}.dmg`
+                    info.darwindownload = `https://github.com/MrFire24/CoffeeOpiaLauncher/releases/download/v${info.version}/LastShot-setup-${info.version}-${process.arch === 'arm64' ? 'arm64' : 'x64'}.dmg`
                     showUpdateUI(info)
                 }
                 

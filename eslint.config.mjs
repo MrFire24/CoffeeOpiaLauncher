@@ -51,5 +51,18 @@ export default defineConfig(
       'no-unused-vars': 'off',
       'no-undef': 'off'
     }
+  },
+  {
+    // Offline ("pirate") auth: these files intentionally keep the original
+    // online-auth logic as disabled reference code — if(false)/if(true) feature
+    // toggles plus unreachable original branches left in place so online auth
+    // can be re-enabled later. Relax the rules that flag exactly that pattern.
+    files: ['app/assets/js/authmanager.js', 'app/assets/js/scripts/settings.js'],
+    rules: {
+      'no-unused-vars': 'off',
+      'no-undef': 'off',
+      'no-constant-condition': 'off',
+      'no-unreachable': 'off'
+    }
   }
 );
