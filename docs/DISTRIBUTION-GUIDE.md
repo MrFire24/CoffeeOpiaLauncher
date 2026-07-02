@@ -140,25 +140,24 @@ NeoForge mods (regular, non-Fabric) go in `forgemods/` — they load through
 `--fml.modLists`, which **NeoForge retained** (Forge 1.20.3+ removed it), so the
 launcher's normal managed-mod mechanism works for them.
 
-### 5b. Getting the Fabric mods to load (the "Files" problem, now fixed)
-On a Forge/NeoForge pack the mods you actually run through **Sinytra Connector**
-are Fabric mods. Pick ONE of:
+### 5b. Fabric mods on a NeoForge pack — just drop them in `fabricmods/`
+On a NeoForge pack the mods you run through **Sinytra Connector** are Fabric
+mods. With this repo's patch, a `--neoforge` server scans **both** folders:
 
-- **A — `FabricMod` + this launcher's fix.** As `Type.FabricMod` modules,
-  LastShot's `reconcileConnectorMods` copies them into the instance `mods/` folder
-  where Connector finds them, and they show up as toggleable mods in the UI.
-  Caveat: a `--neoforge` server (this repo's patch) scans `forgemods/` only, not
-  `fabricmods/`, so to get `FabricMod` entries you must hand-add them to the
-  generated `distribution.json`. If you don't want to edit JSON, use approach B.
-- **B — `Type.File` (works on any launcher, no fix needed).** Declare each Fabric
-  mod as a `File` module with path `mods/<name>.jar`. The launcher downloads it
-  straight into the instance `mods/` folder → Connector loads it. Downside: not
-  shown/toggleable in the Mods UI (it's just a forced file). Simplest if you don't
-  want to touch Nebula.
+- **NeoForge mods → `forgemods/`** (Type.ForgeMod), loaded via `--fml.modLists`.
+- **Fabric mods → `fabricmods/`** (Type.FabricMod). The launcher's
+  `reconcileConnectorMods` copies these into the instance `mods/` folder where
+  Connector discovers them, and they show up as toggleable mods in the UI.
 
-In BOTH cases: **Connector itself and Forgified Fabric API are NeoForge mods** —
-put them in `forgemods/` (they load normally). Only the *actual Fabric mods* need
-the special handling above.
+So you literally drop each jar into the right folder (under
+`required/optionalon/optionaloff`) and `generate distro` picks up both. No Fabric
+loader is added to a NeoForge server — **Connector** provides the Fabric runtime,
+so put **Connector itself and Forgified Fabric API in `forgemods/`** (they're
+NeoForge mods and load normally).
+
+Alternative (no launcher fix needed, e.g. if you ever run stock Helios): declare
+a Fabric mod as a `Type.File` module with path `mods/<name>.jar` — the launcher
+just downloads it into `mods/`. Downside: not toggleable in the UI.
 
 ---
 
@@ -222,7 +221,8 @@ new warnings surface exactly these cases instead of failing silently.
 1. Install Nebula, fill `.env` (`BASE_URL` = your host).
 2. `init root`, create `servers/<id>-1.21.1/`, drop mods into
    `forgemods|fabricmods/{required,optionalon,optionaloff}`.
-3. Handle NeoForge (§5a) + Connector-Fabric mods (§5b, approach A or B).
+3. Put NeoForge mods in `forgemods/`, Fabric mods in `fabricmods/` (§5b) — both
+   are scanned. Connector + FFAPI go in `forgemods/`.
 4. `generate distro`.
 5. Upload the `ROOT` tree to your host at `BASE_URL`.
 6. Set `REMOTE_DISTRO_URL` to your `distribution.json`, run the launcher, verify
