@@ -482,56 +482,68 @@ class ProcessBuilder {
     }
 
     /**
-     * Remove jars from the instance mods/ folder that are no longer part of the
-     * distribution. Helios never prunes these on its own, so mods a host removed
-     * from the pack pile up on clients and cause "mod present on client, missing
-     * on server" mismatches. Keeps every client's modset matching the pack.
+     * Prune ONLY launcher-delivered mods that the host removed from the pack, so
+     * a mod dropped from the distribution stops lingering on clients (which would
+     * cause a "mod on client, missing on server" mismatch). Helios never prunes
+     * these on its own.
      *
-     * Preserves (never deletes):
-     *   - distribution File modules whose path targets mods/  (e.g. Sinytra Connector)
-     *   - Sinytra Connector-managed Fabric jars, tracked in .lastshot-connector-mods.json
-     * Runs after reconcileConnectorMods so the manifest it reads is current.
-     *
-     * Safety: if the expected set is empty, do nothing (never wipe everything).
+     * Crucially this PRESERVES the player's own drop-in mods: we track the set of
+     * distribution-delivered mods/ jars in .lastshot-managed-mods.json and only
+     * delete a jar that WAS delivered by us before and is no longer in the pack.
+     * Any jar the player added themselves was never in that manifest, so it is
+     * never touched. Connector-managed Fabric jars are handled by
+     * reconcileConnectorMods and are ignored here.
      */
     cleanStaleMods(){
         try {
             const modsDir = path.join(this.gameDir, 'mods')
             if(!fs.existsSync(modsDir)) return
 
-            const expected = new Set()
-
-            // 1. Distribution File modules delivered into mods/.
+            // Distribution File modules delivered into mods/ (e.g. Connector, Sodium).
+            const managedNow = new Set()
             for(const mdl of this.server.modules){
                 const raw = mdl.rawModule || {}
                 const p = (raw.artifact && raw.artifact.path) || ''
                 if(raw.type === Type.File && p.startsWith('mods/')){
-                    expected.add(path.basename(p))
+                    managedNow.add(path.basename(p))
                 }
             }
 
-            // 2. Connector-managed Fabric jars (basenames) from our manifest.
+            // What we delivered on the previous launch.
+            const manifestFile = path.join(this.gameDir, '.lastshot-managed-mods.json')
+            let managedPrev = []
             try {
-                const manifestFile = path.join(this.gameDir, '.lastshot-connector-mods.json')
                 if(fs.existsSync(manifestFile)){
-                    for(const name of fs.readJsonSync(manifestFile)){
-                        expected.add(name)
-                    }
+                    managedPrev = fs.readJsonSync(manifestFile)
                 }
             } catch(err) {
-                // If we can't read the connector manifest, bail out entirely rather
-                // than risk deleting managed jars.
-                logger.warn('[Sync] Could not read connector manifest, skipping stale-mod cleanup.', err)
+                logger.warn('[Sync] Could not read managed-mod manifest, skipping cleanup.', err)
                 return
             }
 
-            if(expected.size === 0) return // safety: never wipe everything
-
-            for(const f of fs.readdirSync(modsDir)){
-                if(f.toLowerCase().endsWith('.jar') && !expected.has(f)){
-                    fs.removeSync(path.join(modsDir, f))
-                    logger.info('[Sync] Removed stale mod not in distribution: ' + f)
+            // Delete only jars we delivered before that are no longer in the pack.
+            // Player drop-ins were never in managedPrev, so they are never deleted.
+            const present = new Set(fs.readdirSync(modsDir))
+            for(const name of managedPrev){
+                if(!managedNow.has(name) && present.has(name)){
+                    try {
+                        fs.removeSync(path.join(modsDir, name))
+                        logger.info('[Sync] Removed mod dropped from the pack: ' + name)
+                    } catch(err) {
+                        logger.warn(`[Sync] Failed to remove ${name}`, err)
+                    }
                 }
+            }
+
+            // Persist the current managed set (or drop the manifest if empty).
+            try {
+                if(managedNow.size > 0){
+                    fs.writeJsonSync(manifestFile, [...managedNow])
+                } else if(fs.existsSync(manifestFile)){
+                    fs.removeSync(manifestFile)
+                }
+            } catch(err) {
+                logger.warn('[Sync] Could not write managed-mod manifest.', err)
             }
         } catch(err) {
             logger.warn('[Sync] cleanStaleMods failed:', err)
