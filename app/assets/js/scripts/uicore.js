@@ -62,6 +62,19 @@ if(!isDev){
                     }
                 })
                 showUpdateUI(info)
+                // Light up the prominent landing "update & restart" button (one-click apply).
+                {
+                    const _ub = document.getElementById('landingUpdateNow')
+                    if(_ub){
+                        _ub.style.display = ''
+                        _ub.textContent = `🔄 Обновить до v${info.version} и перезапустить`
+                        _ub.onclick = () => { if(!isDev){ ipcRenderer.send('autoUpdateAction', 'installUpdateNow') } }
+                    }
+                }
+                break
+            case 'download-progress':
+                loggerAutoUpdater.info(`Downloading update.. ${Math.round(info.percent)}%`)
+                settingsUpdateButtonStatus(`Загрузка.. ${Math.round(info.percent)}%`, true)
                 break
             case 'update-not-available':
                 loggerAutoUpdater.info('No new update found.')

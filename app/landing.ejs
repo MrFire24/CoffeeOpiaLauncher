@@ -7,6 +7,12 @@
             </div>
         </div>
         <div id="content">
+            <button id="landingUpdateNow" style="display:none;">🔄 Обновить и перезапустить</button>
+            <style>
+                #landingUpdateNow{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:1000;padding:9px 24px;background:linear-gradient(to right,#2dd36f,#1aa657);color:#fff;font-family:'Avenir Medium';font-size:13px;letter-spacing:1px;border:none;border-radius:5px;cursor:pointer;box-shadow:0 0 12px rgba(45,211,111,.6);animation:hcUpdatePulse 1.8s ease-in-out infinite}
+                #landingUpdateNow:hover{filter:brightness(1.12)}
+                @keyframes hcUpdatePulse{0%,100%{box-shadow:0 0 10px rgba(45,211,111,.5)}50%{box-shadow:0 0 22px rgba(45,211,111,.95)}}
+            </style>
         </div>
         <div id="right">
             <div id="rightContainer">
