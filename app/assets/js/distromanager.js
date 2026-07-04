@@ -7,7 +7,9 @@ const ConfigManager = require('./configmanager')
 // Previous (file.garden): 'https://file.garden/aII_x0KjWXYbh8IN/CoffeeOpia/distribution.json'
 // Local test host: 'http://localhost:8080/lastshot-distro.json' (serve.bat = python http.server 8080).
 // Public host: Netlify (drop the staged upload folder). One line to change if the host moves.
-exports.REMOTE_DISTRO_URL = 'https://benevolent-semolina-d50eae.netlify.app/lastshot-distro.json'
+// Use the production URL (harmonious-lily-e0a3cc.netlify.app) — NOT a deploy-specific
+// <hash>--harmonious-lily permalink, which freezes to one upload.
+exports.REMOTE_DISTRO_URL = 'https://harmonious-lily-e0a3cc.netlify.app/lastshot-distro.json'
 
 const api = new DistributionAPI(
     ConfigManager.getLauncherDirectory(),
