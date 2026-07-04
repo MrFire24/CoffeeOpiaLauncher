@@ -46,6 +46,13 @@ class ProcessBuilder {
      */
     build(){
         fs.ensureDirSync(this.gameDir)
+
+        // Friend-sync: apply host-distributed shared resourcepacks/keybindings and
+        // mod configs (md5-gated — personal settings preserved unless the host
+        // pushes an update). No-op unless the pack ships the shared bundles.
+        this.syncSharedOptions()
+        this.syncSharedConfig()
+
         const tempNativePath = path.join(os.tmpdir(), ConfigManager.getTempNativeFolder(), crypto.pseudoRandomBytes(16).toString('hex'))
         process.throwDeprecation = true
         this.setupLiteLoader()
@@ -58,6 +65,11 @@ class ProcessBuilder {
         // mods/ folder so Connector can discover them (no-op unless the pack
         // mixes Fabric mods into a Forge/NeoForge loader).
         this.reconcileConnectorMods(modObj.fMods)
+
+        // Keep the instance mods/ folder in sync with the distribution: remove
+        // jars that are no longer part of the pack (must run AFTER the connector
+        // reconcile so its freshly-written manifest is respected).
+        this.cleanStaleMods()
 
         // Mod list below 1.13
         // Fabric only supports 1.14+
@@ -389,6 +401,140 @@ class ProcessBuilder {
 
         if(connectorMods.length > 0){
             logger.info(`[Connector] Placed ${connectorMods.length} Fabric mod(s) into mods/ for Sinytra Connector.`)
+        }
+    }
+
+    /**
+     * Apply a distributed `lastshot-shared-options.txt` (shared resource-pack
+     * selection + keybindings) into the player's options.txt, per key.
+     *
+     * "Baseline" behavior: the shared keys are (re)applied only when that file
+     * changes (first launch, or the host pushed an update). All other personal
+     * settings (FOV, mouse sensitivity, volume, etc.) are preserved untouched.
+     */
+    syncSharedOptions(){
+        try {
+            const sharedFile = path.join(this.gameDir, 'lastshot-shared-options.txt')
+            if(!fs.existsSync(sharedFile)) return
+            const sharedRaw = fs.readFileSync(sharedFile, 'utf8')
+            const sharedHash = crypto.createHash('md5').update(sharedRaw).digest('hex')
+            const markerFile = path.join(this.gameDir, '.lastshot-options.json')
+            let marker = {}
+            try { marker = JSON.parse(fs.readFileSync(markerFile, 'utf8')) } catch(_e) { /* first run */ }
+            if(marker.sharedHash === sharedHash) return // unchanged -> respect player's settings
+
+            const shared = new Map()
+            for(const line of sharedRaw.split(/\r?\n/)){
+                const t = line.trim()
+                if(!t || t.startsWith('#')) continue
+                const i = t.indexOf(':')
+                if(i < 0) continue
+                shared.set(t.slice(0, i), t)
+            }
+            if(shared.size === 0) return
+
+            const optionsFile = path.join(this.gameDir, 'options.txt')
+            const applied = new Set()
+            let outLines = []
+            if(fs.existsSync(optionsFile)){
+                outLines = fs.readFileSync(optionsFile, 'utf8').split(/\r?\n/).map(line => {
+                    const i = line.indexOf(':')
+                    if(i < 0) return line
+                    const key = line.slice(0, i)
+                    if(shared.has(key)){ applied.add(key); return shared.get(key) }
+                    return line
+                })
+                while(outLines.length && outLines[outLines.length - 1].trim() === '') outLines.pop()
+            }
+            for(const [key, full] of shared){
+                if(!applied.has(key)) outLines.push(full)
+            }
+            fs.writeFileSync(optionsFile, outLines.join('\n') + '\n', 'utf8')
+            fs.writeFileSync(markerFile, JSON.stringify({ sharedHash, appliedAt: new Date().toISOString() }), 'utf8')
+            logger.info(`[Sync] Applied shared options (${shared.size} keys) to options.txt`)
+        } catch(err) {
+            logger.warn('[Sync] Failed to apply shared options:', err)
+        }
+    }
+
+    /**
+     * Apply a distributed `lastshot-shared-config.zip` into the instance's
+     * config/ folder. "Baseline" behavior: only (re)extracts when the bundle
+     * changes (first launch, or the host pushed updated mod configs). Personal
+     * client configs (video/shaders/voice) are excluded from the bundle by the
+     * host-side packaging tool, so they are never overwritten.
+     */
+    syncSharedConfig(){
+        try {
+            const zipFile = path.join(this.gameDir, 'lastshot-shared-config.zip')
+            if(!fs.existsSync(zipFile)) return
+            const hash = crypto.createHash('md5').update(fs.readFileSync(zipFile)).digest('hex')
+            const markerFile = path.join(this.gameDir, '.lastshot-config.json')
+            let marker = {}
+            try { marker = JSON.parse(fs.readFileSync(markerFile, 'utf8')) } catch(_e) { /* first run */ }
+            if(marker.configHash === hash) return // unchanged -> keep player's configs
+            new AdmZip(zipFile).extractAllTo(path.join(this.gameDir, 'config'), true)
+            fs.writeFileSync(markerFile, JSON.stringify({ configHash: hash, appliedAt: new Date().toISOString() }))
+            logger.info('[Sync] Applied shared mod configs from bundle')
+        } catch(err) {
+            logger.warn('[Sync] Failed to apply shared config:', err)
+        }
+    }
+
+    /**
+     * Remove jars from the instance mods/ folder that are no longer part of the
+     * distribution. Helios never prunes these on its own, so mods a host removed
+     * from the pack pile up on clients and cause "mod present on client, missing
+     * on server" mismatches. Keeps every client's modset matching the pack.
+     *
+     * Preserves (never deletes):
+     *   - distribution File modules whose path targets mods/  (e.g. Sinytra Connector)
+     *   - Sinytra Connector-managed Fabric jars, tracked in .lastshot-connector-mods.json
+     * Runs after reconcileConnectorMods so the manifest it reads is current.
+     *
+     * Safety: if the expected set is empty, do nothing (never wipe everything).
+     */
+    cleanStaleMods(){
+        try {
+            const modsDir = path.join(this.gameDir, 'mods')
+            if(!fs.existsSync(modsDir)) return
+
+            const expected = new Set()
+
+            // 1. Distribution File modules delivered into mods/.
+            for(const mdl of this.server.modules){
+                const raw = mdl.rawModule || {}
+                const p = (raw.artifact && raw.artifact.path) || ''
+                if(raw.type === Type.File && p.startsWith('mods/')){
+                    expected.add(path.basename(p))
+                }
+            }
+
+            // 2. Connector-managed Fabric jars (basenames) from our manifest.
+            try {
+                const manifestFile = path.join(this.gameDir, '.lastshot-connector-mods.json')
+                if(fs.existsSync(manifestFile)){
+                    for(const name of fs.readJsonSync(manifestFile)){
+                        expected.add(name)
+                    }
+                }
+            } catch(err) {
+                // If we can't read the connector manifest, bail out entirely rather
+                // than risk deleting managed jars.
+                logger.warn('[Sync] Could not read connector manifest, skipping stale-mod cleanup.', err)
+                return
+            }
+
+            if(expected.size === 0) return // safety: never wipe everything
+
+            for(const f of fs.readdirSync(modsDir)){
+                if(f.toLowerCase().endsWith('.jar') && !expected.has(f)){
+                    fs.removeSync(path.join(modsDir, f))
+                    logger.info('[Sync] Removed stale mod not in distribution: ' + f)
+                }
+            }
+        } catch(err) {
+            logger.warn('[Sync] cleanStaleMods failed:', err)
         }
     }
 
