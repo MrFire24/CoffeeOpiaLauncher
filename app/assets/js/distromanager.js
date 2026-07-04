@@ -17,4 +17,16 @@ const api = new DistributionAPI(
     false
 )
 
+// Cache-bust the distribution index fetch. Pressing Play (dlAsync ->
+// refreshDistributionOrFallback -> pullRemote) should always pull the freshly
+// pushed distribution.json, but a CDN (Netlify / GitHub Pages) may serve a
+// stale cached copy. Appending a unique query on each pull bypasses that cache.
+// Mod/artifact URLs are unaffected (they stay fixed) — only the index refreshes.
+const _pullRemote = api.pullRemote.bind(api)
+api.pullRemote = function () {
+    const sep = exports.REMOTE_DISTRO_URL.includes('?') ? '&' : '?'
+    this.remoteUrl = exports.REMOTE_DISTRO_URL + sep + '_=' + Date.now()
+    return _pullRemote()
+}
+
 exports.DistroAPI = api
