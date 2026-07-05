@@ -1,4 +1,6 @@
 const { DistributionAPI } = require('helios-core/common')
+const fs   = require('fs')
+const path = require('path')
 
 const ConfigManager = require('./configmanager')
 
@@ -19,27 +21,53 @@ const api = new DistributionAPI(
     false
 )
 
-// Cache-bust the distribution index fetch. Pressing Play (dlAsync ->
-// refreshDistributionOrFallback -> pullRemote) should always pull the freshly
-// pushed distribution.json, but a CDN (Netlify / GitHub Pages) may serve a
-// stale cached copy. Appending a unique query on each pull bypasses that cache.
-// Mod/artifact URLs are unaffected (they stay fixed) — only the index refreshes.
+// Resilient distribution-index fetch. Each attempt is:
+//   1. Cache-busted (`?_=<ts>`) so a CDN/proxy can't pin a stale/failed copy.
+//   2. Bounded by a timeout — helios-core fetches with `got` and NO timeout, so a
+//      host that accepts the TCP connection but stalls (DPI throttling, or a
+//      foreign VPN adding latency to a Russian host) would otherwise hang the
+//      loading screen FOREVER (the UI only shows after this resolves).
+// And we RETRY a few times: a single flaky fetch must not dead-end the launcher.
+// On total failure we return { data: null } so helios falls back to pullLocal
+// (on-disk cache, then the bundled distribution below).
 const _pullRemote = api.pullRemote.bind(api)
-api.pullRemote = function () {
+api.pullRemote = async function () {
     const sep = exports.REMOTE_DISTRO_URL.includes('?') ? '&' : '?'
-    this.remoteUrl = exports.REMOTE_DISTRO_URL + sep + '_=' + Date.now()
-    // Bound the remote fetch with a timeout. helios-core fetches the distribution
-    // with `got` and NO timeout, so a host that accepts the TCP connection but
-    // never sends a response (typical of DPI filtering / throttling in some
-    // regions) hangs the launcher on the loading screen FOREVER — the UI only
-    // shows after this resolves. Racing a timeout makes us return null, so
-    // getDistribution() falls back to the cached distribution (pullLocal) and the
-    // launcher opens instead of hanging.
-    const DISTRO_TIMEOUT_MS = 10000
-    return Promise.race([
-        _pullRemote(),
-        new Promise(resolve => setTimeout(() => resolve({ data: null }), DISTRO_TIMEOUT_MS))
-    ])
+    const DISTRO_TIMEOUT_MS = 12000
+    const MAX_ATTEMPTS = 3
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        this.remoteUrl = exports.REMOTE_DISTRO_URL + sep + '_=' + Date.now()
+        const res = await Promise.race([
+            _pullRemote(),
+            new Promise(resolve => setTimeout(() => resolve({ data: null }), DISTRO_TIMEOUT_MS))
+        ])
+        if (res != null && res.data != null) {
+            return res
+        }
+    }
+    return { data: null }
+}
+
+// Last-resort fallback: a distribution shipped INSIDE the launcher
+// (app/assets/distribution.json, refreshed at release time). helios' pullLocal
+// only reads the user's on-disk cache; a FRESH install has none, so if the remote
+// host is momentarily unreachable at first launch the launcher would hard-fatal
+// ("Unable to Load Distribution Index"). Falling back to the bundled copy lets it
+// open anyway — stale but functional; the next successful remote pull overwrites
+// the on-disk cache. This is what turned "worked once, then a blip = dead" into a
+// recoverable state.
+const _pullLocal = api.pullLocal.bind(api)
+api.pullLocal = async function () {
+    const local = await _pullLocal()
+    if (local != null) {
+        return local
+    }
+    try {
+        const bundled = path.join(__dirname, '..', 'distribution.json')
+        return JSON.parse(fs.readFileSync(bundled, 'utf-8'))
+    } catch (_e) {
+        return null
+    }
 }
 
 exports.DistroAPI = api
