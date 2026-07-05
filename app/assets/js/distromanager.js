@@ -4,6 +4,12 @@ const path = require('path')
 
 const ConfigManager = require('./configmanager')
 
+// Distribution shipped inside the launcher (app/assets/distribution.json, refreshed
+// at release time). Used as a last-resort fallback and to seed the on-disk cache so
+// the launcher works even when the remote host is unreachable. __dirname here is
+// app/assets/js, so the bundled copy sits one level up in app/assets.
+const BUNDLED_DISTRO_PATH = path.join(__dirname, '..', 'distribution.json')
+
 // Old WesterosCraft url.
 // exports.REMOTE_DISTRO_URL = 'http://mc.westeroscraft.com/WesterosCraftLauncher/distribution.json'
 // Previous (file.garden): 'https://file.garden/aII_x0KjWXYbh8IN/CoffeeOpia/distribution.json'
@@ -63,11 +69,33 @@ api.pullLocal = async function () {
         return local
     }
     try {
-        const bundled = path.join(__dirname, '..', 'distribution.json')
-        return JSON.parse(fs.readFileSync(bundled, 'utf-8'))
+        return JSON.parse(fs.readFileSync(BUNDLED_DISTRO_PATH, 'utf-8'))
     } catch (_e) {
         return null
     }
 }
+
+// Seed the on-disk distribution cache from the bundled copy on first run.
+//
+// Why this is necessary in ADDITION to the pullLocal override above: pressing
+// Play spawns a SEPARATE helios receiver process (FullRepairReceiver) to validate
+// and download game files. That subprocess builds its own DistributionAPI and
+// calls getDistributionLocalLoadOnly() -> pullLocal(), reading ONLY the on-disk
+// cache — our in-renderer pullLocal override does NOT run there. So a player who
+// cannot reach the remote host (e.g. the host aborts their connection) gets the
+// launcher open (renderer fallback) but then hits
+// "FATAL: Unable to load distribution from local disk" at Play time.
+//
+// Writing the bundled distribution to the on-disk cache path when it is missing
+// gives EVERY process — renderer and receiver subprocess — a distribution to read.
+// Only seeds when absent, so a fresher distro from a successful remote pull is
+// never clobbered. Must be kept in sync with the hosted distro on each pack regen.
+try {
+    const cachePath = path.join(ConfigManager.getLauncherDirectory(), 'distribution.json')
+    if (!fs.existsSync(cachePath)) {
+        fs.mkdirSync(path.dirname(cachePath), { recursive: true })
+        fs.copyFileSync(BUNDLED_DISTRO_PATH, cachePath)
+    }
+} catch (_e) { /* non-fatal: falls through to normal remote/local load */ }
 
 exports.DistroAPI = api
