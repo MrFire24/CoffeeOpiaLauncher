@@ -43,16 +43,18 @@ if(!isDev){
             case 'checking-for-update':
                 loggerAutoUpdater.info('Checking for update..')
                 settingsUpdateButtonStatus(Lang.queryJS('uicore.autoUpdate.checkingForUpdateButton'), true)
+                updateFatalErrorStatus(Lang.queryJS('uicore.autoUpdate.fatalCheckingStatus'))
                 break
             case 'update-available':
                 loggerAutoUpdater.info('New update available', info.version)
-                
+
                 if(process.platform === 'darwin'){
                     info.darwindownload = `https://github.com/MrFire24/CoffeeOpiaLauncher/releases/download/v${info.version}/LastShot-setup-${info.version}-${process.arch === 'arm64' ? 'arm64' : 'x64'}.dmg`
                     showUpdateUI(info)
                 }
-                
+
                 populateSettingsUpdateInformation(info)
+                updateFatalErrorStatus(Lang.queryJS('uicore.autoUpdate.fatalDownloadingStatus', { version: info.version }))
                 break
             case 'update-downloaded':
                 loggerAutoUpdater.info('Update ' + info.version + ' ready to be installed.')
@@ -71,14 +73,19 @@ if(!isDev){
                         _ub.onclick = () => { if(!isDev){ ipcRenderer.send('autoUpdateAction', 'installUpdateNow') } }
                     }
                 }
+                // If the distro index failed, the main UI never loaded — turn the
+                // dead-end fatal overlay into a one-click "update & restart" instead.
+                showFatalUpdateReady(info)
                 break
             case 'download-progress':
                 loggerAutoUpdater.info(`Downloading update.. ${Math.round(info.percent)}%`)
                 settingsUpdateButtonStatus(`Загрузка.. ${Math.round(info.percent)}%`, true)
+                updateFatalErrorStatus(Lang.queryJS('uicore.autoUpdate.fatalProgressStatus', { percent: Math.round(info.percent) }))
                 break
             case 'update-not-available':
                 loggerAutoUpdater.info('No new update found.')
                 settingsUpdateButtonStatus(Lang.queryJS('uicore.autoUpdate.checkForUpdatesButton'))
+                updateFatalErrorStatus(Lang.queryJS('uicore.autoUpdate.fatalNoUpdateStatus'))
                 break
             case 'ready':
                 updateCheckListener = setInterval(() => {
@@ -90,11 +97,14 @@ if(!isDev){
                 if(info != null && info.code != null){
                     if(info.code === 'ERR_UPDATER_INVALID_RELEASE_FEED'){
                         loggerAutoUpdater.info('No suitable releases found.')
+                        updateFatalErrorStatus(Lang.queryJS('uicore.autoUpdate.fatalNoUpdateStatus'))
                     } else if(info.code === 'ERR_XML_MISSED_ELEMENT'){
                         loggerAutoUpdater.info('No releases found.')
+                        updateFatalErrorStatus(Lang.queryJS('uicore.autoUpdate.fatalNoUpdateStatus'))
                     } else {
                         loggerAutoUpdater.error('Error during update check..', info)
                         loggerAutoUpdater.debug('Error Code:', info.code)
+                        updateFatalErrorStatus(Lang.queryJS('uicore.autoUpdate.fatalUpdateErrorStatus'))
                     }
                 }
                 break

@@ -292,8 +292,11 @@ okButton = "OK"
 
 [js.uibinder.startup]
 fatalErrorTitle = "Fatal Error: Unable to Load Distribution Index"
-fatalErrorMessage = "A connection could not be established to our servers to download the distribution index. No local copies were available to load. <br><br>The distribution index is an essential file which provides the latest server information. The launcher is unable to start without it. Ensure you are connected to the internet and relaunch the application."
+fatalErrorMessage = "A connection could not be established to our servers to download the distribution index. No local copies were available to load. <br><br>The distribution index is an essential file which provides the latest server information. The launcher is unable to start without it. Ensure you are connected to the internet and relaunch the application.<br><br>Checking for a launcher update anyway…"
 closeButton = "Close"
+fatalUpdateReadyTitle = "Launcher update v{version} available"
+fatalUpdateReadyMessage = "The distribution server is unreachable, but a launcher update is available that may fix this (e.g. a new storage address). Install it and restart?"
+fatalUpdateReadyAcknowledge = "Update & Restart"
 
 [js.uibinder.validateAccount]
 failedMessageTitle = "Failed to Refresh Login"
@@ -306,6 +309,11 @@ selectAnotherAccountButton = "Select Another Account"
 checkingForUpdateButton = "Checking for Updates..."
 installNowButton = "Install Now"
 checkForUpdatesButton = "Check for Updates"
+fatalCheckingStatus = "Checking for a launcher update…"
+fatalDownloadingStatus = "Launcher update v{version} found — downloading…"
+fatalProgressStatus = "Downloading launcher update… {percent}%"
+fatalNoUpdateStatus = "No launcher update available. Check your internet connection and try again."
+fatalUpdateErrorStatus = "Couldn't check for launcher updates. Check your internet connection."
 
 [js.auth.microsoft.error]
 noProfileTitle = "Error During Login:<br>Profile Not Set Up"

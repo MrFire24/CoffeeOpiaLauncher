@@ -121,8 +121,64 @@ function showFatalStartupError(){
                 window.close()
             })
             toggleOverlay(true)
+
+            // The distribution index is unreachable, but the launcher can still
+            // update ITSELF: electron-updater pulls releases from GitHub, which is
+            // completely independent of the distro host. So instead of a hard
+            // dead-end, kick off a launcher-update check here too — a broken or
+            // blocked distro host then becomes recoverable by shipping a launcher
+            // fix (new REMOTE_DISTRO_URL, etc.). If an update downloads, the
+            // autoUpdateNotification handler in uicore.js turns THIS overlay into a
+            // one-click "update & restart" (see showFatalUpdateReady below).
+            if(!isDev){
+                loggerAutoUpdater.info('Distribution unreachable — checking for a launcher update anyway.')
+                ipcRenderer.send('autoUpdateAction', 'initAutoUpdater', ConfigManager.getAllowPrerelease())
+            }
         })
     }, 750)
+}
+
+/**
+ * While the fatal-startup overlay is showing, update just its description line to
+ * reflect launcher-update progress (checking / downloading / none found). No-op if
+ * we are not in the fatal-startup state.
+ *
+ * @param {string} message The status message to display.
+ */
+function updateFatalErrorStatus(message){
+    if(!fatalStartupError){
+        return
+    }
+    document.getElementById('overlayDesc').innerHTML = message
+}
+
+/**
+ * The distribution index failed to load, but a launcher update has now been
+ * downloaded that may fix it. Convert the dead-end fatal overlay into a
+ * recoverable "update & restart" prompt. No-op if we are not in the fatal state.
+ *
+ * @param {Object} info electron-updater update info (expects .version).
+ */
+function showFatalUpdateReady(info){
+    if(!fatalStartupError){
+        return
+    }
+    setOverlayContent(
+        Lang.queryJS('uibinder.startup.fatalUpdateReadyTitle', { version: info.version }),
+        Lang.queryJS('uibinder.startup.fatalUpdateReadyMessage'),
+        Lang.queryJS('uibinder.startup.fatalUpdateReadyAcknowledge'),
+        Lang.queryJS('uibinder.startup.closeButton')
+    )
+    setOverlayHandler(() => {
+        if(!isDev){
+            ipcRenderer.send('autoUpdateAction', 'installUpdateNow')
+        }
+    })
+    setDismissHandler(() => {
+        const window = remote.getCurrentWindow()
+        window.close()
+    })
+    toggleOverlay(true, true)
 }
 
 /**
