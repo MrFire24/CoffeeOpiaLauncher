@@ -1,4 +1,5 @@
 const { DistributionAPI } = require('helios-core/common')
+const got  = require('got')
 const fs   = require('fs')
 const path = require('path')
 
@@ -27,28 +28,35 @@ const api = new DistributionAPI(
     false
 )
 
-// Resilient distribution-index fetch. Each attempt is:
-//   1. Cache-busted (`?_=<ts>`) so a CDN/proxy can't pin a stale/failed copy.
-//   2. Bounded by a timeout — helios-core fetches with `got` and NO timeout, so a
-//      host that accepts the TCP connection but stalls (DPI throttling, or a
-//      foreign VPN adding latency to a Russian host) would otherwise hang the
-//      loading screen FOREVER (the UI only shows after this resolves).
+// Resilient distribution-index fetch. We do the fetch ourselves (instead of
+// helios' pullRemote) so we can control three things helios can't:
+//   1. Cache-bust (`?_=<ts>`) so a CDN/proxy can't pin a stale/failed copy.
+//   2. A timeout — helios fetches with `got` and NO timeout, so a host that
+//      accepts the TCP connection but stalls (DPI throttling, or a foreign VPN
+//      adding latency to a Russian host) would hang the loading screen FOREVER.
+//   3. `decompress: false` — our host (Cyberduck upload) tags .json objects with
+//      a bogus `Content-Encoding: gzip` while the body is plain text. got would
+//      try to gunzip it and throw Z_DATA_ERROR ("incorrect header check"). We
+//      fetch the raw buffer and JSON.parse it ourselves, sidestepping the lie.
 // And we RETRY a few times: a single flaky fetch must not dead-end the launcher.
-// On total failure we return { data: null } so helios falls back to pullLocal
-// (on-disk cache, then the bundled distribution below).
-const _pullRemote = api.pullRemote.bind(api)
+// On total failure we return { data: null } so getDistribution() falls back to
+// pullLocal (on-disk cache, then the bundled distribution below).
 api.pullRemote = async function () {
     const sep = exports.REMOTE_DISTRO_URL.includes('?') ? '&' : '?'
     const DISTRO_TIMEOUT_MS = 12000
     const MAX_ATTEMPTS = 3
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        this.remoteUrl = exports.REMOTE_DISTRO_URL + sep + '_=' + Date.now()
-        const res = await Promise.race([
-            _pullRemote(),
-            new Promise(resolve => setTimeout(() => resolve({ data: null }), DISTRO_TIMEOUT_MS))
-        ])
-        if (res != null && res.data != null) {
-            return res
+        const url = exports.REMOTE_DISTRO_URL + sep + '_=' + Date.now()
+        try {
+            const res = await got.get(url, {
+                responseType: 'buffer',
+                decompress: false,
+                timeout: { request: DISTRO_TIMEOUT_MS }
+            })
+            const data = JSON.parse(res.body.toString('utf-8'))
+            return { data }
+        } catch (_e) {
+            // timeout / network / parse error — try again, then fall through to cache
         }
     }
     return { data: null }

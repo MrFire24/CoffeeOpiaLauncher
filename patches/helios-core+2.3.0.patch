@@ -1,0 +1,13 @@
+diff --git a/node_modules/helios-core/dist/dl/DownloadEngine.js b/node_modules/helios-core/dist/dl/DownloadEngine.js
+index 922cd1a..fa5d3b1 100644
+--- a/node_modules/helios-core/dist/dl/DownloadEngine.js
++++ b/node_modules/helios-core/dist/dl/DownloadEngine.js
+@@ -82,7 +82,7 @@ async function downloadFile(url, path, onProgress) {
+             log.debug(`Retry attempt #${retryCount} for ${url}.`);
+         }
+         try {
+-            const downloadStream = got_1.default.stream(url);
++            const downloadStream = got_1.default.stream(url, { decompress: !/twcstorage\.ru/.test(url) });
+             fileWriterStream = (0, fs_1.createWriteStream)(path);
+             if (onProgress) {
+                 downloadStream.on('downloadProgress', (progress) => onProgress(progress));
