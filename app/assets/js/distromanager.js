@@ -31,9 +31,8 @@ exports.distroSource = 'remote'
 // list AND regenerate that mirror's distribution.json with matching URLs.
 // Previous single hosts: Netlify (harmonious/benevolent, dead), file.garden, WesterosCraft.
 exports.REMOTE_DISTRO_URLS = [
-    'https://s3.twcstorage.ru/last-shot-files/lastshot-upload/lastshot-distro.json'
-    // TODO: add Netlify mirror index URL here, e.g.
-    // 'https://<site>.netlify.app/lastshot-distro.json'
+    'https://s3.twcstorage.ru/last-shot-files/lastshot-upload/lastshot-distro.json', // RU (Timeweb)
+    'https://harmonious-lily-e0a3cc.netlify.app/lastshot-distro.json'                // global/UA (Netlify)
 ]
 // Kept for any code referencing a single URL (helios' this.remoteUrl is unused —
 // our pullRemote override below builds requests from REMOTE_DISTRO_URLS).
