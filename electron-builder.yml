@@ -39,6 +39,14 @@ mac:
         - 'arm64'
   artifactName: '${productName}-setup-${version}-${arch}.${ext}'
   category: 'public.app-category.games'
+  # Declare microphone usage so in-game voice chat (Simple Voice Chat) works.
+  # Without NSMicrophoneUsageDescription in the launcher's Info.plist, macOS blocks
+  # the microphone for the child Java process and the mod reports "your launcher
+  # does not support microphone permissions on macOS".
+  extendInfo:
+    NSMicrophoneUsageDescription: 'LastShot needs microphone access so in-game voice chat (Simple Voice Chat) can work.'
+  entitlements: 'build/entitlements.mac.plist'
+  entitlementsInherit: 'build/entitlements.mac.plist'
 
 # Linux Configuration
 linux: 

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Microphone access for in-game voice chat (Simple Voice Chat). The
+         NSMicrophoneUsageDescription in the app's Info.plist (see electron-builder.yml
+         mac.extendInfo) is what actually drives the macOS permission prompt; this
+         entitlement is required in addition when the app is (ad-hoc) signed with a
+         hardened runtime. entitlementsInherit applies it to child processes. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <!-- The launched Minecraft/JVM needs these under the hardened runtime: the JIT
+         and dynamically generated code, unsigned native libraries/mods, and JVM
+         env vars. This set is a superset of electron-builder's default mac
+         entitlements (which this file replaces), plus the microphone key above. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
