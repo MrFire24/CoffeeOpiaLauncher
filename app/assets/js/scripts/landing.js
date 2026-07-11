@@ -291,6 +291,37 @@ function showLaunchFailure(title, desc){
     toggleLaunchArea(false)
 }
 
+/**
+ * Translate a raw helios/got file-download error (Z_DATA_ERROR, "server aborted
+ * pending request", ENOTFOUND, ...) into a plain, ACTIONABLE explanation for the
+ * player. The raw technical string means nothing to them and hides both what
+ * broke and what to do about it. We lead with plain language and keep the
+ * technical detail as a small secondary line for support/debugging.
+ *
+ * @param {Error} err The error thrown by verifyFiles/download/spawn.
+ * @returns {string} HTML description for showLaunchFailure.
+ */
+function explainDownloadError(err){
+    const raw = (err && (err.displayable || err.message || String(err))) || ''
+    const hay = (raw + ' ' + ((err && err.code) || '')).toLowerCase()
+
+    let msg
+    if(/aborted|econnreset|etimedout|enotfound|eai_again|socket hang up|econnrefused|timed out|z_data_error|incorrect header|unexpected end|getaddrinfo|read error/.test(hay)){
+        // Network / connection to the file host failed or was severed.
+        msg = 'Не удалось скачать файлы сборки — сервер файлов недоступен или соединение обрывается.<br><br>Проверь интернет и попробуй <b>без VPN</b> (файлы лежат на российском хостинге — с зарубежным VPN бывает медленнее и рвётся), затем нажми «Играть» ещё раз.'
+    } else if(/enospc|no space|not enough space/.test(hay)){
+        msg = 'На диске нет свободного места для файлов сборки. Освободи место и попробуй снова.'
+    } else if(/eacces|eperm|operation not permitted|access is denied|permission/.test(hay)){
+        msg = 'Нет прав на запись файлов сборки. Проверь антивирус или запусти лаунчер от имени администратора.'
+    } else {
+        msg = 'Не удалось скачать файлы сборки. Проверь интернет/VPN и нажми «Играть» ещё раз.'
+    }
+    if(raw){
+        msg += `<br><br><span style="opacity:.55;font-size:11px">Техническая деталь: ${raw}</span>`
+    }
+    return msg
+}
+
 /* System (Java) Scan */
 
 /**
@@ -490,7 +521,7 @@ async function dlAsync(login = true) {
 
     fullRepairModule.childProcess.on('error', (err) => {
         loggerLaunchSuite.error('Error during launch', err)
-        showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringLaunchTitle'), err.message || Lang.queryJS('landing.dlAsync.errorDuringLaunchText'))
+        showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringLaunchTitle'), explainDownloadError(err))
     })
     fullRepairModule.childProcess.on('close', (code, _signal) => {
         if(code !== 0){
@@ -509,7 +540,7 @@ async function dlAsync(login = true) {
         setLaunchPercentage(100)
     } catch (err) {
         loggerLaunchSuite.error('Error during file validation.')
-        showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileVerificationTitle'), err.displayable || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
+        showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileVerificationTitle'), explainDownloadError(err))
         return
     }
     
@@ -525,7 +556,7 @@ async function dlAsync(login = true) {
             setDownloadPercentage(100)
         } catch(err) {
             loggerLaunchSuite.error('Error during file download.')
-            showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileDownloadTitle'), err.displayable || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
+            showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileDownloadTitle'), explainDownloadError(err))
             return
         }
     } else {
