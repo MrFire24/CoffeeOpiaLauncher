@@ -30,6 +30,10 @@ exports.distroSource = 'remote'
 // Order is a hint only (race, not sequential). To add/move a mirror, edit this
 // list AND regenerate that mirror's distribution.json with matching URLs.
 // Previous single hosts: Netlify (harmonious/benevolent, dead), file.garden, WesterosCraft.
+// Both mirrors may serve the SAME distribution.json (whatever host its artifact
+// URLs contain) — pullRemote below rewrites every artifact URL to the mirror that
+// actually answered, so there are NO per-host distro variants to keep in sync.
+// Just deploy the identical lastshot-upload folder to both hosts.
 exports.REMOTE_DISTRO_URLS = [
     'https://s3.twcstorage.ru/last-shot-files/lastshot-upload/lastshot-distro.json', // RU (Timeweb)
     'https://harmonious-lily-e0a3cc.netlify.app/lastshot-distro.json'                // global/UA (Netlify)
@@ -64,15 +68,29 @@ const api = new DistributionAPI(
 api.pullRemote = async function () {
     const DISTRO_TIMEOUT_MS = 12000
     const MAX_ROUNDS = 2
-    const fetchMirror = async (base) => {
-        const sep = base.includes('?') ? '&' : '?'
-        const res = await got.get(base + sep + '_=' + Date.now(), {
+    // Base URL of each mirror = its index URL minus the trailing file name.
+    const MIRROR_BASES = exports.REMOTE_DISTRO_URLS.map(u => u.replace(/\/[^/]*$/, ''))
+    const fetchMirror = async (indexUrl) => {
+        const myBase = indexUrl.replace(/\/[^/]*$/, '')
+        const sep = indexUrl.includes('?') ? '&' : '?'
+        const res = await got.get(indexUrl + sep + '_=' + Date.now(), {
             responseType: 'buffer',
             decompress: false,
             headers: { 'accept-encoding': 'identity' },
             timeout: { request: DISTRO_TIMEOUT_MS }
         })
-        return JSON.parse(res.body.toString('utf-8'))
+        let text = res.body.toString('utf-8')
+        // Normalize every artifact URL to the mirror that actually answered, so the
+        // pack downloads from a host THIS player can reach — no matter which host's
+        // URLs the uploaded distribution.json happens to contain. This lets both
+        // mirrors serve the SAME distribution.json (no per-host variants to keep in
+        // sync): whichever mirror wins the race, its own base is stamped on the URLs.
+        for (const b of MIRROR_BASES) {
+            if (b && b !== myBase) {
+                text = text.split(b).join(myBase)
+            }
+        }
+        return JSON.parse(text)
     }
     for (let round = 1; round <= MAX_ROUNDS; round++) {
         try {
