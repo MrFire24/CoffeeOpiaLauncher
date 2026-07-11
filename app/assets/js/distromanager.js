@@ -19,14 +19,25 @@ const BUNDLED_DISTRO_PATH = path.join(__dirname, '..', 'distribution.json')
 // Read by uibinder.showMainUI() to decide whether to show the landing warning.
 exports.distroSource = 'remote'
 
-// Old WesterosCraft url.
-// exports.REMOTE_DISTRO_URL = 'http://mc.westeroscraft.com/WesterosCraftLauncher/distribution.json'
-// Previous (file.garden): 'https://file.garden/aII_x0KjWXYbh8IN/CoffeeOpia/distribution.json'
-// Local test host: 'http://localhost:8080/lastshot-distro.json' (serve.bat = python http.server 8080).
-// Public host: Timeweb Object Storage (S3, s3.twcstorage.ru) — reachable inside
-// Russia without a VPN (Netlify was DPI-blocked there). Bucket last-shot-files,
-// folder lastshot-upload. One line to change if the host moves.
-exports.REMOTE_DISTRO_URL = 'https://s3.twcstorage.ru/last-shot-files/lastshot-upload/lastshot-distro.json'
+// DUAL-MIRROR hosting. Each mirror holds a FULL copy of the pack plus its OWN
+// distribution.json whose artifact URLs point at that same mirror (so whichever
+// index loads, its files download from a reachable host). We race the mirrors
+// (Promise.any) and use the first that responds — no waiting on a blocked one:
+//   - Timeweb (s3.twcstorage.ru) — reachable inside Russia without a VPN.
+//   - Netlify — reachable from Ukraine / EU / the rest of the world (Timeweb is
+//     blocked from Ukraine; Netlify is DPI-blocked inside Russia — together they
+//     cover everyone).
+// Order is a hint only (race, not sequential). To add/move a mirror, edit this
+// list AND regenerate that mirror's distribution.json with matching URLs.
+// Previous single hosts: Netlify (harmonious/benevolent, dead), file.garden, WesterosCraft.
+exports.REMOTE_DISTRO_URLS = [
+    'https://s3.twcstorage.ru/last-shot-files/lastshot-upload/lastshot-distro.json'
+    // TODO: add Netlify mirror index URL here, e.g.
+    // 'https://<site>.netlify.app/lastshot-distro.json'
+]
+// Kept for any code referencing a single URL (helios' this.remoteUrl is unused —
+// our pullRemote override below builds requests from REMOTE_DISTRO_URLS).
+exports.REMOTE_DISTRO_URL = exports.REMOTE_DISTRO_URLS[0]
 
 const api = new DistributionAPI(
     ConfigManager.getLauncherDirectory(),
@@ -37,35 +48,42 @@ const api = new DistributionAPI(
 )
 
 // Resilient distribution-index fetch. We do the fetch ourselves (instead of
-// helios' pullRemote) so we can control three things helios can't:
-//   1. Cache-bust (`?_=<ts>`) so a CDN/proxy can't pin a stale/failed copy.
-//   2. A timeout — helios fetches with `got` and NO timeout, so a host that
-//      accepts the TCP connection but stalls (DPI throttling, or a foreign VPN
-//      adding latency to a Russian host) would hang the loading screen FOREVER.
-//   3. `decompress: false` — our host (Cyberduck upload) tags .json objects with
-//      a bogus `Content-Encoding: gzip` while the body is plain text. got would
-//      try to gunzip it and throw Z_DATA_ERROR ("incorrect header check"). We
-//      fetch the raw buffer and JSON.parse it ourselves, sidestepping the lie.
-// And we RETRY a few times: a single flaky fetch must not dead-end the launcher.
+// helios' pullRemote) so we can control four things helios can't:
+//   1. Multiple MIRRORS raced with Promise.any — the first to respond wins, so a
+//      player blocked from one host (Timeweb from Ukraine, Netlify from Russia)
+//      gets the other with no sequential wait on the dead one.
+//   2. Cache-bust (`?_=<ts>`) so a CDN/proxy can't pin a stale/failed copy.
+//   3. A timeout — helios fetches with `got` and NO timeout, so a host that
+//      accepts the TCP connection but stalls (DPI throttling) would hang forever.
+//   4. `decompress: false` + `accept-encoding: identity` — the Timeweb host
+//      (Cyberduck upload) tags .json with a bogus `Content-Encoding: gzip` while
+//      the body is plain text; got would gunzip it and throw Z_DATA_ERROR. Asking
+//      for identity means honest hosts (Netlify) send it uncompressed too, so we
+//      can always JSON.parse the raw buffer ourselves regardless of mirror.
 // On total failure we return { data: null } so getDistribution() falls back to
 // pullLocal (on-disk cache, then the bundled distribution below).
 api.pullRemote = async function () {
-    const sep = exports.REMOTE_DISTRO_URL.includes('?') ? '&' : '?'
     const DISTRO_TIMEOUT_MS = 12000
-    const MAX_ATTEMPTS = 3
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        const url = exports.REMOTE_DISTRO_URL + sep + '_=' + Date.now()
+    const MAX_ROUNDS = 2
+    const fetchMirror = async (base) => {
+        const sep = base.includes('?') ? '&' : '?'
+        const res = await got.get(base + sep + '_=' + Date.now(), {
+            responseType: 'buffer',
+            decompress: false,
+            headers: { 'accept-encoding': 'identity' },
+            timeout: { request: DISTRO_TIMEOUT_MS }
+        })
+        return JSON.parse(res.body.toString('utf-8'))
+    }
+    for (let round = 1; round <= MAX_ROUNDS; round++) {
         try {
-            const res = await got.get(url, {
-                responseType: 'buffer',
-                decompress: false,
-                timeout: { request: DISTRO_TIMEOUT_MS }
-            })
-            const data = JSON.parse(res.body.toString('utf-8'))
+            // Promise.any resolves with the first mirror that succeeds; it only
+            // rejects (AggregateError) if EVERY mirror failed this round.
+            const data = await Promise.any(exports.REMOTE_DISTRO_URLS.map(fetchMirror))
             exports.distroSource = 'remote'
             return { data }
         } catch (_e) {
-            // timeout / network / parse error — try again, then fall through to cache
+            // all mirrors failed this round — retry, then fall through to cache
         }
     }
     return { data: null }
