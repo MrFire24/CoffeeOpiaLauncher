@@ -11,6 +11,14 @@ const ConfigManager = require('./configmanager')
 // app/assets/js, so the bundled copy sits one level up in app/assets.
 const BUNDLED_DISTRO_PATH = path.join(__dirname, '..', 'distribution.json')
 
+// Where the currently-loaded distribution came from, so the UI can warn the player
+// when they're NOT on a fresh copy from the host:
+//   'remote' — freshly fetched from the host (all good, no warning)
+//   'cache'  — host unreachable, using the last successfully-downloaded copy on disk
+//   'bundle' — host unreachable AND no disk cache (fresh install) → built-in copy
+// Read by uibinder.showMainUI() to decide whether to show the landing warning.
+exports.distroSource = 'remote'
+
 // Old WesterosCraft url.
 // exports.REMOTE_DISTRO_URL = 'http://mc.westeroscraft.com/WesterosCraftLauncher/distribution.json'
 // Previous (file.garden): 'https://file.garden/aII_x0KjWXYbh8IN/CoffeeOpia/distribution.json'
@@ -54,6 +62,7 @@ api.pullRemote = async function () {
                 timeout: { request: DISTRO_TIMEOUT_MS }
             })
             const data = JSON.parse(res.body.toString('utf-8'))
+            exports.distroSource = 'remote'
             return { data }
         } catch (_e) {
             // timeout / network / parse error — try again, then fall through to cache
@@ -74,10 +83,13 @@ const _pullLocal = api.pullLocal.bind(api)
 api.pullLocal = async function () {
     const local = await _pullLocal()
     if (local != null) {
+        exports.distroSource = 'cache'
         return local
     }
     try {
-        return JSON.parse(fs.readFileSync(BUNDLED_DISTRO_PATH, 'utf-8'))
+        const bundled = JSON.parse(fs.readFileSync(BUNDLED_DISTRO_PATH, 'utf-8'))
+        exports.distroSource = 'bundle'
+        return bundled
     } catch (_e) {
         return null
     }

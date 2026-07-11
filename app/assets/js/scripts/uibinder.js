@@ -67,6 +67,7 @@ async function showMainUI(data){
     await prepareSettings(true)
     updateSelectedServer(data.getServerById(ConfigManager.getSelectedServer()))
     refreshServerStatus()
+    maybeShowDistroWarning()
     setTimeout(() => {
         document.getElementById('frameBar').style.backgroundColor = 'rgba(0, 0, 0, 0.5)'
         document.body.style.backgroundImage = `url('assets/images/backgrounds/${document.body.getAttribute('bkid')}.png')`
@@ -105,6 +106,37 @@ async function showMainUI(data){
     initNews().then(() => {
         $('#newsContainer *').attr('tabindex', '-1')
     })
+}
+
+/**
+ * If the distribution index was NOT freshly fetched from the host (the launcher
+ * fell back to the on-disk cache or the built-in bundled copy because the host was
+ * unreachable), surface a non-blocking warning on the landing screen. Without this
+ * the launcher would silently run on a possibly-stale build list — hiding both a
+ * connectivity problem and the fact that a pushed pack update wasn't received.
+ */
+function maybeShowDistroWarning(){
+    const source = require('./assets/js/distromanager').distroSource
+    if(source === 'remote'){
+        return
+    }
+    const banner = document.getElementById('landingDistroWarning')
+    const text = document.getElementById('landingDistroWarningText')
+    if(banner == null || text == null){
+        return
+    }
+    if(source === 'bundle'){
+        // Fresh install that couldn't reach the host at all — most severe.
+        text.innerHTML = '⚠️ Не удалось связаться с сервером сборки — запущена встроенная копия списка модов, она может быть устаревшей. Проверь интернет/VPN и перезапусти лаунчер.'
+    } else {
+        // Had a previous successful download; using it because refresh failed.
+        text.innerHTML = '⚠️ Не удалось обновить список сборки — играешь на сохранённой версии. Если недавно вышло обновление пака, его пока нет. Проверь интернет/VPN.'
+    }
+    banner.style.display = 'flex'
+    const close = document.getElementById('landingDistroWarningClose')
+    if(close != null){
+        close.onclick = () => { banner.style.display = 'none' }
+    }
 }
 
 function showFatalStartupError(){

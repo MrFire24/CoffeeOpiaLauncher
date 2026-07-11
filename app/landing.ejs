@@ -8,10 +8,17 @@
         </div>
         <div id="content">
             <button id="landingUpdateNow" style="display:none;">🔄 Обновить и перезапустить</button>
+            <div id="landingDistroWarning" style="display:none;">
+                <span id="landingDistroWarningText"></span>
+                <span id="landingDistroWarningClose" title="Скрыть">&times;</span>
+            </div>
             <style>
                 #landingUpdateNow{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:1000;padding:9px 24px;background:linear-gradient(to right,#2dd36f,#1aa657);color:#fff;font-family:'Avenir Medium';font-size:13px;letter-spacing:1px;border:none;border-radius:5px;cursor:pointer;box-shadow:0 0 12px rgba(45,211,111,.6);animation:hcUpdatePulse 1.8s ease-in-out infinite}
                 #landingUpdateNow:hover{filter:brightness(1.12)}
                 @keyframes hcUpdatePulse{0%,100%{box-shadow:0 0 10px rgba(45,211,111,.5)}50%{box-shadow:0 0 22px rgba(45,211,111,.95)}}
+                #landingDistroWarning{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:999;display:flex;align-items:center;gap:12px;max-width:70%;padding:8px 14px;background:rgba(60,42,10,.92);border:1px solid #d8a13a;border-radius:5px;color:#f4d38a;font-family:'Avenir Medium';font-size:12px;letter-spacing:.4px;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+                #landingDistroWarningClose{cursor:pointer;font-size:16px;line-height:1;color:#f4d38a;opacity:.7}
+                #landingDistroWarningClose:hover{opacity:1}
             </style>
         </div>
         <div id="right">
