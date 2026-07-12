@@ -1,5 +1,18 @@
+diff --git a/node_modules/helios-core/dist/common/distribution/DistributionFactory.js b/node_modules/helios-core/dist/common/distribution/DistributionFactory.js
+index d2d927f..dba9a47 100644
+--- a/node_modules/helios-core/dist/common/distribution/DistributionFactory.js
++++ b/node_modules/helios-core/dist/common/distribution/DistributionFactory.js
+@@ -112,7 +112,7 @@ class HeliosServer {
+     }
+     defaultJavaVersion() {
+         if ((0, MojangUtils_1.mcVersionAtLeast)('1.20.5', this.rawServer.minecraftVersion)) {
+-            return ['>=21.x', 21];
++            return ['>=21.x <22.x', 21];
+         }
+         else if ((0, MojangUtils_1.mcVersionAtLeast)('1.17', this.rawServer.minecraftVersion)) {
+             return ['>=17.x', 17];
 diff --git a/node_modules/helios-core/dist/dl/DownloadEngine.js b/node_modules/helios-core/dist/dl/DownloadEngine.js
-index 922cd1a..fa5d3b1 100644
+index 922cd1a..9a5b6de 100644
 --- a/node_modules/helios-core/dist/dl/DownloadEngine.js
 +++ b/node_modules/helios-core/dist/dl/DownloadEngine.js
 @@ -82,7 +82,7 @@ async function downloadFile(url, path, onProgress) {
@@ -7,7 +20,16 @@ index 922cd1a..fa5d3b1 100644
          }
          try {
 -            const downloadStream = got_1.default.stream(url);
-+            const downloadStream = got_1.default.stream(url, { decompress: !/twcstorage\.ru/.test(url) });
++            const downloadStream = got_1.default.stream(url, { decompress: !/twcstorage\.ru/.test(url), timeout: { socket: 30000 } });
              fileWriterStream = (0, fs_1.createWriteStream)(path);
              if (onProgress) {
                  downloadStream.on('downloadProgress', (progress) => onProgress(progress));
+@@ -122,7 +122,7 @@ async function downloadFile(url, path, onProgress) {
+ function retryableError(error) {
+     if (error instanceof got_1.RequestError) {
+         // error.name === 'RequestError' means server did not respond.
+-        return error.name === 'RequestError' || error instanceof got_1.ReadError && error.code === 'ECONNRESET';
++        return error.name === 'RequestError' || error.name === 'TimeoutError' || error instanceof got_1.ReadError && error.code === 'ECONNRESET';
+     }
+     else {
+         return false;
