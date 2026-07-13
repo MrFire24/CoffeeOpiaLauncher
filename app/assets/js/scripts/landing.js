@@ -235,19 +235,62 @@ const refreshMojangStatuses = async function(){
     document.getElementById('mojang_status_icon').style.color = MojangRestAPI.statusToHex(status)
 }
 
+/**
+ * Query the server status, retrying a few times before giving up. A single ping
+ * can fail on a transient network blip (dropped packet, brief latency spike) —
+ * without retries that flips the UI to "offline" for the whole 5-minute refresh
+ * interval even though the server is up. The protocol version passed to the ping
+ * is derived from the pack's Minecraft version instead of a hardcoded 47 (1.8),
+ * so the handshake matches the actual server.
+ *
+ * @param {Object} serv The selected server (has hostname/port/minecraftVersion).
+ * @param {number} attempts How many times to try before declaring offline.
+ * @returns {Promise<Object>} The server status; throws only if every attempt failed.
+ */
+async function getServerStatusWithRetry(serv, attempts = 3){
+    const protocol = mcVersionToProtocol(serv.rawServer?.minecraftVersion)
+    let lastErr
+    for(let i = 1; i <= attempts; i++){
+        try {
+            return await getServerStatus(protocol, serv.hostname, serv.port)
+        } catch (err) {
+            lastErr = err
+            if(i < attempts){
+                await new Promise(r => setTimeout(r, 1200))
+            }
+        }
+    }
+    throw lastErr
+}
+
+/**
+ * Map a Minecraft version to its handshake protocol number. Falls back to a
+ * recent protocol if unknown — the status ping is tolerant, but sending a version
+ * close to the server's avoids edge-case rejections. 1.21.1 = 767.
+ */
+function mcVersionToProtocol(mcVersion){
+    const known = {
+        '1.21.1': 767, '1.21': 767,
+        '1.20.6': 766, '1.20.4': 765, '1.20.1': 763
+    }
+    return known[mcVersion] || 767
+}
+
 const refreshServerStatus = async (fade = false) => {
     loggerLanding.info('Refreshing Server Status')
     const serv = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
 
     let pLabel = Lang.queryJS('landing.serverStatus.server')
     let pVal = Lang.queryJS('landing.serverStatus.offline')
+    let online = false
 
     try {
 
-        const servStat = await getServerStatus(47, serv.hostname, serv.port)
-        console.log(servStat)
+        const servStat = await getServerStatusWithRetry(serv)
+        loggerLanding.info(`Server status: ${servStat.players.online}/${servStat.players.max} players online.`)
         pLabel = Lang.queryJS('landing.serverStatus.players')
         pVal = servStat.players.online + '/' + servStat.players.max
+        online = true
 
     } catch (err) {
         loggerLanding.warn('Unable to refresh server status, assuming offline.')
@@ -263,7 +306,8 @@ const refreshServerStatus = async (fade = false) => {
         document.getElementById('landingPlayerLabel').innerHTML = pLabel
         document.getElementById('player_count').innerHTML = pVal
     }
-    
+
+    return online
 }
 
 refreshMojangStatuses()
@@ -271,8 +315,24 @@ refreshMojangStatuses()
 
 // Refresh statuses every hour. The status page itself refreshes every day so...
 let mojangStatusListener = setInterval(() => refreshMojangStatuses(true), 60*60*1000)
-// Set refresh rate to once every 5 minutes.
-let serverStatusListener = setInterval(() => refreshServerStatus(true), 300000)
+
+// Poll server status on an adaptive cadence: every 60s while it's up, but every
+// 15s while it shows offline so a server that just came back online (or a status
+// ping that failed transiently) is reflected quickly instead of being stuck
+// "offline" for minutes. (Old behaviour: a flat 5-minute interval — a brief blip
+// or a just-started server left the UI wrong for up to 5 minutes.)
+const SERVER_STATUS_INTERVAL_ONLINE = 60000
+const SERVER_STATUS_INTERVAL_OFFLINE = 15000
+let serverStatusTimeout = null
+async function scheduleServerStatusRefresh(){
+    const online = await refreshServerStatus(true)
+    if(serverStatusTimeout != null){
+        clearTimeout(serverStatusTimeout)
+    }
+    serverStatusTimeout = setTimeout(scheduleServerStatusRefresh,
+        online ? SERVER_STATUS_INTERVAL_ONLINE : SERVER_STATUS_INTERVAL_OFFLINE)
+}
+let serverStatusListener = setTimeout(scheduleServerStatusRefresh, SERVER_STATUS_INTERVAL_ONLINE)
 
 /**
  * Shows an error overlay, toggles off the launch area.
